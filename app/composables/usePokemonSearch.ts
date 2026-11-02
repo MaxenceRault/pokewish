@@ -12,12 +12,12 @@ export interface UsePokemonSearch {
 
 /** Noms français (depuis le cache si possible), sinon noms anglais en secours. */
 async function loadDex(): Promise<Pokemon[]> {
-  const cached = parsePokemonList(localStorage.getItem(DEX_CACHE_KEY))
+  const cached = loadDexCache()
   if (cached.length) return cached
 
   try {
     const dex = await fetchPokemonListFr()
-    localStorage.setItem(DEX_CACHE_KEY, JSON.stringify(dex))
+    saveDexCache(dex)
     return dex
   } catch (error) {
     console.warn('Noms français indisponibles, noms anglais en secours', error)

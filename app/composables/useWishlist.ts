@@ -15,12 +15,8 @@ export function useWishlist(): UseWishlist {
 
   // localStorage n'existe que dans le navigateur : on charge après le montage
   onMounted(() => {
-    list.value = parseWishlist(localStorage.getItem(STORAGE_KEY))
-    watch(
-      list,
-      (value) => localStorage.setItem(STORAGE_KEY, JSON.stringify(value)),
-      { deep: true },
-    )
+    list.value = loadWishlist()
+    watch(list, (value) => saveWishlist(value), { deep: true })
   })
 
   return {
