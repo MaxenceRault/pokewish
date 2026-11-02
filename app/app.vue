@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Pokemon } from '~/types/pokemon'
+import { formatDexNumber } from '~/utils/format'
 
 const { list, add, toggle, remove, syncNames } = useWishlist()
 const { query, results, dex, status } = usePokemonSearch()
@@ -20,7 +21,7 @@ function pick(pokemon: Pokemon): void {
 }
 
 function dexNumber(id: number): string {
-  return `#${String(id).padStart(4, '0')}`
+  return formatDexNumber(id)
 }
 </script>
 
