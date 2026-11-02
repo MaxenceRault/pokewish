@@ -1,71 +1,120 @@
 name: CI
 
+# Chaque push (toutes branches) lance la CI, visible dans l'onglet Actions.
+# Les checks s'affichent aussi dans la PR de la branche, une seule fois.
 on:
-  # Sur une PR : les contrôles s'affichent dans l'onglet « Checks » de la PR
-  pull_request:
-  # Sur main : on revérifie après chaque merge
   push:
-    branches: [main]
 
-# Un job par contrôle : chacun apparaît comme une coche séparée dans la PR,
-# et ils tournent en parallèle (l'échec de l'un n'arrête pas les autres).
+# Un job par contrôle et par projet (front = Nuxt, back = API Hono) :
+# chacun apparaît comme une coche séparée, et ils tournent en parallèle.
 jobs:
   lint:
-    name: Lint (ESLint)
+    name: Lint (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [front, back]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm run lint
 
   prettier:
-    name: Prettier
+    name: Prettier (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [front, back]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm run format:check
 
   typecheck:
-    name: Typecheck
+    name: Typecheck (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [front, back]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm run typecheck
 
   test:
-    name: Tests (Vitest)
+    name: Tests Vitest (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [front, back]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm test
 
   build:
-    name: Build (Nuxt)
+    name: Build (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [front, back]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm run build
+
+      # Back uniquement : on démarre l'API buildée et on vérifie GET /health
+      - name: Smoke test GET /health
+        if: matrix.project == 'back'
+        run: |
+          PORT=3001 npm start &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3001/health && exit 0
+            sleep 0.5
+          done
+          echo "GET /health n'a pas répondu 200" && exit 1

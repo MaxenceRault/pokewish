@@ -1,75 +1,31 @@
-# Nuxt Minimal Starter
+# PokéWish
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Wishlist de Pokémon à capturer (6 maximum).
 
-## Setup
+| Dossier  | Contenu                           | Port par défaut |
+| -------- | --------------------------------- | --------------- |
+| `front/` | App Nuxt (Vue + TypeScript)       | 3000            |
+| `back/`  | API Hono + TypeScript (sans base) | 3001            |
 
-Make sure to install dependencies:
-
-```bash
-# npm
-npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+## Lancer en local
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
+cd front && npm install && npm run dev   # http://localhost:3000
+cd back  && npm install && npm run dev   # http://localhost:3001/health
 ```
 
-## Production
+## Contrôles (identiques en local et dans la CI)
 
-Build the application for production:
+Dans `front/` comme dans `back/` :
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npm run lint          # ESLint
+npm run format:check  # Prettier
+npm run typecheck     # TypeScript
+npm test              # Vitest
+npm run build         # Build
 ```
 
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+La CI (`.github/workflows/ci.yml`) lance ces 5 contrôles pour chaque projet à
+chaque push. Pour le back, elle démarre aussi l'API et vérifie que
+`GET /health` répond 200.
