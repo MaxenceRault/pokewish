@@ -6,6 +6,8 @@ export interface UseWishlist {
   add: (pokemon: Pokemon) => void
   toggle: (id: number) => void
   remove: (id: number) => void
+  /** Reprend les noms du Pokédex (ex. anciens noms anglais -> français) */
+  syncNames: (dex: Pokemon[]) => void
 }
 
 export function useWishlist(): UseWishlist {
@@ -31,6 +33,9 @@ export function useWishlist(): UseWishlist {
     },
     remove(id) {
       list.value = removePokemon(list.value, id)
+    },
+    syncNames(dex) {
+      list.value = renameWishlist(list.value, dex)
     },
   }
 }

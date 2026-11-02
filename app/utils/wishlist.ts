@@ -1,6 +1,8 @@
 import type { Pokemon, WishlistItem } from '~/types/pokemon'
 
 export const STORAGE_KEY = 'pokewish:list'
+/** Cache de la liste des noms français (elle ne change quasiment jamais). */
+export const DEX_CACHE_KEY = 'pokewish:dex-fr:v1'
 
 /** Comme une équipe : 6 Pokémon maximum dans la wishlist. */
 export const MAX_WISHLIST = 6
@@ -18,15 +20,24 @@ export function idFromUrl(url: string): number {
   return Number(url.split('/').filter(Boolean).pop())
 }
 
+/** Minuscules, sans espaces autour ni accents : « Salamèche » -> « salameche ». */
+export function normalizeName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+}
+
 export function searchPokemon(
   all: Pokemon[],
   query: string,
   limit = 10,
 ): Pokemon[] {
-  const q = query.trim().toLowerCase()
+  const q = normalizeName(query)
   if (!q) return []
   return all
-    .filter((p) => p.name.includes(q) || String(p.id) === q)
+    .filter((p) => normalizeName(p.name).includes(q) || String(p.id) === q)
     .slice(0, limit)
 }
 
@@ -48,6 +59,35 @@ export function removePokemon(
   id: number,
 ): WishlistItem[] {
   return list.filter((p) => p.id !== id)
+}
+
+/**
+ * Met à jour les noms de la wishlist depuis le Pokédex (ex. anciens noms
+ * anglais -> français). Renvoie la même liste si rien ne change.
+ */
+export function renameWishlist(
+  list: WishlistItem[],
+  dex: Pokemon[],
+): WishlistItem[] {
+  const names = new Map(dex.map((p) => [p.id, p.name]))
+  const changed = list.some((p) => (names.get(p.id) ?? p.name) !== p.name)
+  if (!changed) return list
+  return list.map((p) => ({ ...p, name: names.get(p.id) ?? p.name }))
+}
+
+/** Relit une liste de Pokémon mise en cache ; [] si absente ou invalide. */
+export function parsePokemonList(raw: string | null): Pokemon[] {
+  if (!raw) return []
+  try {
+    const data: unknown = JSON.parse(raw)
+    if (!Array.isArray(data)) return []
+    return data.filter(
+      (p): p is Pokemon =>
+        typeof p?.id === 'number' && typeof p?.name === 'string',
+    )
+  } catch {
+    return []
+  }
 }
 
 export function parseWishlist(raw: string | null): WishlistItem[] {

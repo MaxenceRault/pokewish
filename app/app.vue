@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { Pokemon } from '~/types/pokemon'
 
-const { list, add, toggle, remove } = useWishlist()
-const { query, results, status } = usePokemonSearch()
+const { list, add, toggle, remove, syncNames } = useWishlist()
+const { query, results, dex, status } = usePokemonSearch()
+
+// Dès que le Pokédex (noms français) est là, on renomme la wishlist sauvegardée
+watch([dex, list], ([d]) => d.length && syncNames(d))
 
 const inList = computed(() => new Set(list.value.map((p) => p.id)))
 const isFull = computed(() => isWishlistFull(list.value))
@@ -76,7 +79,7 @@ function dexNumber(id: number): string {
             Chargement du Pokédex<span class="blink">_</span>
           </p>
           <p v-else-if="!query" class="hint">
-            Essaie « pika », « char » ou « 25 ».
+            Essaie « pika », « salamèche » ou « 25 ».
           </p>
           <p v-else-if="!results.length" class="hint">Aucun Pokémon trouvé.</p>
 

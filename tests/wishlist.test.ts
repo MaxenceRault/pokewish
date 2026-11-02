@@ -4,8 +4,11 @@ import {
   idFromUrl,
   isWishlistFull,
   MAX_WISHLIST,
+  normalizeName,
+  parsePokemonList,
   parseWishlist,
   removePokemon,
+  renameWishlist,
   searchPokemon,
   toggleCaught,
 } from '../app/utils/wishlist'
@@ -119,6 +122,22 @@ describe('recherche', () => {
     expect(searchPokemon(all, '  ')).toEqual([])
   })
 
+  it('ignore les accents (noms français)', () => {
+    const fr: Pokemon[] = [
+      { id: 4, name: 'Salamèche' },
+      { id: 7, name: 'Carapuce' },
+      { id: 29, name: 'Nidoran♀' },
+    ]
+    expect(searchPokemon(fr, 'salameche')).toEqual([fr[0]])
+    expect(searchPokemon(fr, 'SALAMÈ')).toEqual([fr[0]])
+    expect(searchPokemon(fr, 'nidoran')).toEqual([fr[2]])
+  })
+
+  it('normalizeName : minuscules, sans accents ni espaces autour', () => {
+    expect(normalizeName('  Évoli ')).toBe('evoli')
+    expect(normalizeName('Héricendre')).toBe('hericendre')
+  })
+
   it("extrait l'id depuis une URL PokéAPI", () => {
     expect(idFromUrl('https://pokeapi.co/api/v2/pokemon/25/')).toBe(25)
   })
@@ -139,5 +158,31 @@ describe('sauvegarde', () => {
 
   it('tronque à 6 une sauvegarde trop longue', () => {
     expect(parseWishlist(JSON.stringify(makeList(9)))).toHaveLength(6)
+  })
+})
+
+describe('noms français', () => {
+  it('renameWishlist reprend les noms du Pokédex en gardant le statut', () => {
+    const list: WishlistItem[] = [
+      { id: 4, name: 'charmander', caught: true },
+      { id: 999999, name: 'inconnu', caught: false },
+    ]
+    expect(renameWishlist(list, [{ id: 4, name: 'Salamèche' }])).toEqual([
+      { id: 4, name: 'Salamèche', caught: true },
+      { id: 999999, name: 'inconnu', caught: false },
+    ])
+  })
+
+  it('renameWishlist renvoie la même liste si rien ne change', () => {
+    const list: WishlistItem[] = [{ id: 4, name: 'Salamèche', caught: false }]
+    expect(renameWishlist(list, [{ id: 4, name: 'Salamèche' }])).toBe(list)
+  })
+
+  it('parsePokemonList relit le cache et ignore un contenu invalide', () => {
+    const dex: Pokemon[] = [{ id: 1, name: 'Bulbizarre' }]
+    expect(parsePokemonList(JSON.stringify(dex))).toEqual(dex)
+    expect(parsePokemonList(null)).toEqual([])
+    expect(parsePokemonList('{oups')).toEqual([])
+    expect(parsePokemonList('[{"id":"1"}]')).toEqual([])
   })
 })
