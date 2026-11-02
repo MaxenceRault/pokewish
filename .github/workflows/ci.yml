@@ -1,14 +1,17 @@
 name: CI
 
 on:
-  push:
+  # Sur une PR : les contrôles s'affichent dans l'onglet « Checks » de la PR
   pull_request:
+  # Sur main : on revérifie après chaque merge
+  push:
+    branches: [main]
 
-# 3 jobs indépendants, lancés en parallèle : chacun a sa propre coche
-# dans GitHub, et l'échec de l'un n'empêche pas les autres de tourner.
+# Un job par contrôle : chacun apparaît comme une coche séparée dans la PR,
+# et ils tournent en parallèle (l'échec de l'un n'arrête pas les autres).
 jobs:
-  quality:
-    name: Qualité (format, lint, types)
+  lint:
+    name: Lint (ESLint)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,14 +19,32 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Install
-        run: npm ci
-      - name: Format
-        run: npm run format:check
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck
-        run: npm run typecheck
+      - run: npm ci
+      - run: npm run lint
+
+  prettier:
+    name: Prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
 
   test:
     name: Tests (Vitest)
@@ -34,10 +55,8 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Install
-        run: npm ci
-      - name: Tests
-        run: npm test
+      - run: npm ci
+      - run: npm test
 
   build:
     name: Build (Nuxt)
@@ -48,7 +67,5 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Install
-        run: npm ci
-      - name: Build
-        run: npm run build
+      - run: npm ci
+      - run: npm run build
