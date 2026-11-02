@@ -95,7 +95,7 @@ function dexNumber(id: number): string {
           </p>
           <p v-else-if="!results.length" class="hint">Aucun Pokémon trouvé.</p>
 
-          <ul v-else class="results">
+          <ul v-else class="results" aria-label="Résultats de recherche">
             <li v-for="p in results" :key="p.id">
               <button
                 type="button"
@@ -159,7 +159,7 @@ function dexNumber(id: number): string {
             </p>
           </div>
 
-          <ul v-else class="wishlist">
+          <ul v-else class="wishlist" aria-label="Ma wishlist">
             <li
               v-for="p in list"
               :key="p.id"

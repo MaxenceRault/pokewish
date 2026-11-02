@@ -11,9 +11,11 @@ export default defineNuxtConfig({
       apiBase: 'http://localhost:3001',
     },
   },
-  // Inclut les tests Vitest dans `nuxt typecheck`
+  // Inclut les tests (Vitest et Playwright) dans `nuxt typecheck`
   typescript: {
-    tsConfig: { include: ['../tests/**/*'] },
+    tsConfig: {
+      include: ['../tests/**/*', '../e2e/**/*', '../playwright.config.ts'],
+    },
   },
   app: {
     head: {

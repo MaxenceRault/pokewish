@@ -34,6 +34,16 @@ chaque redémarrage de l'API.
 
 Les erreurs ont toutes la forme `{ "error": "CODE", "message": "…" }`.
 
+## Tests e2e (Playwright)
+
+```bash
+cd front && npm run test:e2e      # ou test:e2e:ui pour l'interface visuelle
+```
+
+Playwright build et démarre lui-même l'API (port 3101) et le front (port 3100),
+sans gêner les serveurs de dev. PokéAPI est simulée : pas besoin de réseau.
+Premier lancement : `npx playwright install chromium`.
+
 ## Contrôles (identiques en local et dans la CI)
 
 Dans `front/` comme dans `back/` :
