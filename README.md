@@ -9,10 +9,30 @@ Wishlist de Pokémon à capturer (6 maximum).
 
 ## Lancer en local
 
+Le front a besoin de l'API pour la wishlist : lance les deux, dans deux terminaux.
+
 ```bash
-cd front && npm install && npm run dev   # http://localhost:3000
 cd back  && npm install && npm run dev   # http://localhost:3001/health
+cd front && npm install && npm run dev   # http://localhost:3000
 ```
+
+Pour pointer le front vers une autre API (tests e2e, autre port) :
+`NUXT_PUBLIC_API_BASE=http://localhost:4000 npm run dev`.
+
+## API
+
+La wishlist est gardée dans un tableau en mémoire : elle repart à vide à
+chaque redémarrage de l'API.
+
+| Route                  | Corps                  | Réponses                                    |
+| ---------------------- | ---------------------- | ------------------------------------------- |
+| `GET /health`          |                        | 200                                         |
+| `GET /wishlist`        |                        | 200 liste                                   |
+| `POST /wishlist`       | `{ "id": 25, "name" }` | 201, 400, 409 `DUPLICATE` / `WISHLIST_FULL` |
+| `PATCH /wishlist/:id`  | `{ "caught": true }`   | 200, 400, 404                               |
+| `DELETE /wishlist/:id` |                        | 204, 400, 404                               |
+
+Les erreurs ont toutes la forme `{ "error": "CODE", "message": "…" }`.
 
 ## Contrôles (identiques en local et dans la CI)
 

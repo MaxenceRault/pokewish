@@ -2,11 +2,16 @@
 import type { Pokemon } from '~/types/pokemon'
 import { formatDexNumber } from '~/utils/format'
 
-const { list, add, toggle, remove, syncNames } = useWishlist()
-const { query, results, dex, status } = usePokemonSearch()
-
-// Dès que le Pokédex (noms français) est là, on renomme la wishlist sauvegardée
-watch([dex, list], ([d]) => d.length && syncNames(d))
+const {
+  list,
+  status: listStatus,
+  error: apiError,
+  add,
+  toggle,
+  remove,
+  reload,
+} = useWishlist()
+const { query, results, status } = usePokemonSearch()
 
 const inList = computed(() => new Set(list.value.map((p) => p.id)))
 const isFull = computed(() => isWishlistFull(list.value))
@@ -15,9 +20,9 @@ const progress = computed(() =>
   list.value.length ? (caughtCount.value / list.value.length) * 100 : 0,
 )
 
-function pick(pokemon: Pokemon): void {
-  add(pokemon)
-  query.value = ''
+async function pick(pokemon: Pokemon): Promise<void> {
+  await add(pokemon)
+  if (!apiError.value) query.value = ''
 }
 
 function dexNumber(id: number): string {
@@ -68,7 +73,13 @@ function dexNumber(id: number): string {
             />
           </label>
 
-          <p v-if="isFull" class="full">
+          <p v-if="apiError" class="full" role="alert">
+            {{ apiError }}
+            <button type="button" class="retry" @click="reload">
+              Réessayer
+            </button>
+          </p>
+          <p v-else-if="isFull" class="full">
             Wishlist pleine ({{ MAX_WISHLIST }}/{{ MAX_WISHLIST }}) : retire un
             Pokémon pour en ajouter un autre.
           </p>
@@ -89,7 +100,9 @@ function dexNumber(id: number): string {
               <button
                 type="button"
                 class="tile"
-                :disabled="inList.has(p.id) || isFull"
+                :disabled="
+                  inList.has(p.id) || isFull || listStatus !== 'success'
+                "
                 @click="pick(p)"
               >
                 <img :src="spriteUrl(p.id)" alt="" width="72" height="72" />
@@ -131,9 +144,16 @@ function dexNumber(id: number): string {
             <span :style="{ width: `${progress}%` }" />
           </div>
 
-          <div v-if="!list.length" class="empty">
+          <p v-if="listStatus === 'pending'" class="hint">
+            Connexion à l'API<span class="blink">_</span>
+          </p>
+
+          <div v-else-if="!list.length" class="empty">
             <span class="empty__ball" aria-hidden="true" />
-            <p>
+            <p v-if="listStatus === 'error'">
+              Impossible de charger la wishlist depuis l'API.
+            </p>
+            <p v-else>
               Ta wishlist est vide.<br />Cherche un Pokémon au-dessus pour
               l'ajouter.
             </p>
