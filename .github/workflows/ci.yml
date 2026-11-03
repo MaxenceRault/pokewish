@@ -225,3 +225,42 @@ jobs:
             curl -sf --retry 3 --retry-all-errors "$API_URL$route"
             echo
           done
+
+  # Front Nuxt (SSR) sur Vercel : sur main, après la mise à jour de l'API
+  # (elle-même lancée seulement si tous les contrôles sont verts).
+  # Secrets GitHub nécessaires : VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+  deploy-front:
+    name: Déploiement Vercel (front SSR)
+    needs: [deploy]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-vercel
+      cancel-in-progress: false
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      FRONT_URL: ${{ vars.FRONT_URL }}
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci
+      # Réglages et variables (NUXT_PUBLIC_API_BASE…) du projet Vercel
+      - run: npx vercel@65 pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - run: npx vercel@65 build --prod --token="$VERCEL_TOKEN"
+      - run: npx vercel@65 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      # Le HTML d'une fiche doit sortir du serveur déjà rempli (SSR)
+      - name: Vérification SSR (/pokemon/25)
+        if: env.FRONT_URL != ''
+        run: |
+          html=$(curl -sf --retry 3 --retry-all-errors "$FRONT_URL/pokemon/25")
+          echo "$html" | grep -o '<title>[^<]*</title>'
+          echo "$html" | grep -q 'Pikachu' || { echo "Fiche absente du HTML"; exit 1; }

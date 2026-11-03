@@ -9,6 +9,9 @@ export default defineNuxtConfig({
       // Adresse de l'API Hono (back/). Surchargeable sans rebuild :
       // NUXT_PUBLIC_API_BASE=http://localhost:4000 npm run dev
       apiBase: 'http://localhost:3001',
+      // PokéAPI REST, appelée aussi côté serveur (SSR des fiches).
+      // Remplacée par un faux PokéAPI dans les tests e2e : NUXT_PUBLIC_POKEAPI_URL
+      pokeapiUrl: 'https://pokeapi.co/api/v2',
     },
   },
   // Anglais par défaut (/), les autres langues préfixées (/fr, /es, /de) :

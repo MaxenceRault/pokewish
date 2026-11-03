@@ -262,7 +262,20 @@ describe('fetchPokemonDetails (fiche /pokemon/[name])', () => {
     })
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `${POKEAPI_URL}/pokemon/charizard`,
-      `${POKEAPI_URL}/pokemon-species/6/`,
+      `${POKEAPI_URL}/pokemon-species/6`,
+    ])
+  })
+
+  it('base remplaçable (faux PokéAPI des tests e2e) : les 2 appels y vont', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(pokemonData))
+      .mockResolvedValueOnce(jsonResponse(speciesData))
+
+    await fetchPokemonDetails(6, 'fr', 'http://localhost:3102')
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://localhost:3102/pokemon/6',
+      'http://localhost:3102/pokemon-species/6',
     ])
   })
 

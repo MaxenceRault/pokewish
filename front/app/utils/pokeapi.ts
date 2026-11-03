@@ -92,22 +92,28 @@ export async function fetchPokemon(
 
 /**
  * Fiche complète d'un Pokémon (nom anglais ou numéro) avec les textes dans
- * `lang` ; `null` s'il n'existe pas (404). Deux appels : /pokemon puis
+ * `lang` ; `null` s'il n'existe pas (404). `baseUrl` : PokéAPI par défaut,
+ * remplaçable (runtimeConfig pokeapiUrl) pour les tests e2e en SSR. Deux appels : /pokemon puis
  * /pokemon-species. Types et stats restent des clés (fire, hp…) : leur
  * libellé vient des fichiers de traduction de l'app.
  */
 export async function fetchPokemonDetails(
   nameOrId: string | number,
   lang = 'en',
+  baseUrl = POKEAPI_URL,
 ): Promise<PokemonDetails | null> {
-  const res = await fetch(`${POKEAPI_URL}/pokemon/${pokemonKey(nameOrId)}`)
+  const res = await fetch(`${baseUrl}/pokemon/${pokemonKey(nameOrId)}`)
   if (res.status === 404) return null
   if (!res.ok) throw new PokeApiError(res.status)
   const pokemon = (await res.json()) as PokeApiPokemonResponse
 
   // L'espèce donne le nom, la catégorie et la description traduits.
   // Si elle ne répond pas, on affiche quand même la fiche.
-  const speciesRes = await fetch(pokemon.species.url)
+  // Même serveur que /pokemon (PokéAPI ou son double de test) : on ne suit
+  // pas l'URL absolue renvoyée, on n'en garde que le numéro de l'espèce.
+  const speciesRes = await fetch(
+    `${baseUrl}/pokemon-species/${idFromUrl(pokemon.species.url)}`,
+  )
   const species = speciesRes.ok
     ? ((await speciesRes.json()) as PokeApiSpeciesResponse)
     : null

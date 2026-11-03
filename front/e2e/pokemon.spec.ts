@@ -66,4 +66,29 @@ test.describe('Fiche /pokemon/[name]', () => {
       page.getByRole('heading', { level: 1, name: 'Pikachu' }),
     ).toBeVisible()
   })
+
+  // SSR : une simple requête HTTP (sans navigateur, sans JavaScript)
+  // reçoit déjà la fiche complète dans le HTML.
+  test.describe('rendu serveur (SSR)', () => {
+    test('le HTML de /pokemon/25 contient la fiche', async ({ request }) => {
+      const res = await request.get('/fr/pokemon/25')
+
+      expect(res.status()).toBe(200)
+      const html = await res.text()
+      expect(html).toContain('<title>Pikachu · PokéWish</title>')
+      expect(html).toMatch(/<h1[^>]*>\s*Pikachu\s*<\/h1>/)
+      expect(html).toContain('Pokémon Souris')
+      expect(html).toContain('Électrik')
+      expect(html).toContain('Il stocke de l’électricité dans ses joues.')
+      // et non l'écran de chargement des pages rendues côté client
+      expect(html).not.toContain('Analyse en cours')
+    })
+
+    test('Pokémon inexistant : vrai code HTTP 404', async ({ request }) => {
+      const res = await request.get('/fr/pokemon/missingno')
+
+      expect(res.status()).toBe(404)
+      expect(await res.text()).toContain('Pokémon introuvable')
+    })
+  })
 })

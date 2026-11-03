@@ -8,21 +8,27 @@ const param = computed(() => String(route.params.name))
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-// Chargée dans le navigateur, comme la recherche : PokéAPI est appelée
-// directement par le client (et simulable dans les tests e2e).
+// Rendue côté serveur (SSR) : le HTML renvoyé contient déjà la fiche
+// (nom, types, stats…). Le navigateur réutilise ces données sans rappeler
+// PokéAPI ; il ne la rappelle que lors d'une navigation dans l'app.
+const pokeapiUrl = useRuntimeConfig().public.pokeapiUrl
 const {
   data: pokemon,
   status,
   refresh,
-} = useAsyncData(
+} = await useAsyncData(
   () => `pokemon-${param.value}-${locale.value}`,
-  () => fetchPokemonDetails(param.value, locale.value),
-  { server: false },
+  () => fetchPokemonDetails(param.value, locale.value, pokeapiUrl),
 )
 
 const notFound = computed(
   () => status.value === 'success' && pokemon.value === null,
 )
+
+// Pokémon inexistant : vrai code HTTP 404 dans la réponse du serveur
+if (import.meta.server && notFound.value) {
+  setResponseStatus(useRequestEvent()!, 404)
+}
 
 useHead(() => ({
   title: pokemon.value
