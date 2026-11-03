@@ -21,8 +21,16 @@ Pour pointer le front vers une autre API (tests e2e, autre port) :
 
 ## API
 
-La wishlist est gardée dans un tableau en mémoire : elle repart à vide à
-chaque redémarrage de l'API.
+La wishlist est stockée dans **PostgreSQL (Supabase)**, table `wishlist`
+([back/db/init.sql](back/db/init.sql)). Sans `DATABASE_URL`, l'API retombe
+sur un tableau en mémoire (perdu au redémarrage) : c'est le cas dans la CI.
+
+```bash
+cd back
+cp .env.example .env    # puis remplir DATABASE_URL (Supabase > Connect > Session pooler)
+npm run db:migrate      # crée la table (rejouable sans risque)
+npm run dev             # « Wishlist : PostgreSQL (DATABASE_URL) »
+```
 
 | Route                  | Corps                  | Réponses                                    |
 | ---------------------- | ---------------------- | ------------------------------------------- |

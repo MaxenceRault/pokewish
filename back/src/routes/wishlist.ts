@@ -63,11 +63,11 @@ export function wishlistRoutes(store: WishlistStore) {
   return (
     new Hono()
       // Toute la wishlist
-      .get('/', (c) => c.json(store.all(), 200))
+      .get('/', async (c) => c.json(await store.all(), 200))
 
       // Ajoute un Pokémon : 201, ou 409 si doublon / liste pleine
-      .post('/', pokemonBody, (c) => {
-        const result = store.add(c.req.valid('json'))
+      .post('/', pokemonBody, async (c) => {
+        const result = await store.add(c.req.valid('json'))
         if ('error' in result) {
           return c.json<ApiError>(
             { error: result.error, message: ADD_ERRORS[result.error] },
@@ -78,17 +78,18 @@ export function wishlistRoutes(store: WishlistStore) {
       })
 
       // Marque capturé / à capturer
-      .patch('/:id', idParam, caughtBody, (c) => {
+      .patch('/:id', idParam, caughtBody, async (c) => {
         const { id } = c.req.valid('param')
-        const item = store.setCaught(id, c.req.valid('json').caught)
+        const item = await store.setCaught(id, c.req.valid('json').caught)
         if (!item) return c.json<ApiError>(notFound(id), 404)
         return c.json(item, 200)
       })
 
       // Retire un Pokémon : 204, ou 404 s'il n'y était pas
-      .delete('/:id', idParam, (c) => {
+      .delete('/:id', idParam, async (c) => {
         const { id } = c.req.valid('param')
-        if (!store.remove(id)) return c.json<ApiError>(notFound(id), 404)
+        if (!(await store.remove(id)))
+          return c.json<ApiError>(notFound(id), 404)
         return c.body(null, 204)
       })
   )
