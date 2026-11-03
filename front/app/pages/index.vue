@@ -11,7 +11,12 @@ const {
   remove,
   reload,
 } = useWishlist()
-const { query, results, status } = usePokemonSearch()
+const { query, results, status, nameOf } = usePokemonSearch()
+const { t } = useI18n()
+const localePath = useLocalePath()
+
+/** Nom dans la langue choisie ; sinon celui enregistré à l'ajout. */
+const displayName = (p: Pokemon) => nameOf(p.id) ?? p.name
 
 const inList = computed(() => new Set(list.value.map((p) => p.id)))
 const isFull = computed(() => isWishlistFull(list.value))
@@ -37,6 +42,7 @@ function dexNumber(id: number): string {
       <header class="top-bar">
         <span class="lens" aria-hidden="true" />
         <span class="leds" aria-hidden="true"><i /><i /><i /></span>
+        <LangSwitcher class="lang-switch" />
         <h1 class="brand">PokéWish</h1>
       </header>
 
@@ -44,14 +50,12 @@ function dexNumber(id: number): string {
         <span class="bezel__dots" aria-hidden="true"><i /><i /></span>
         <div class="screen">
           <div class="screen__label">
-            <span>Recherche</span>
+            <span>{{ t('search.label') }}</span>
             <span class="status" :class="`status--${status}`">
               {{
-                status === 'pending'
-                  ? 'Synchro…'
-                  : status === 'error'
-                    ? 'Hors ligne'
-                    : 'En ligne'
+                t(
+                  `search.status.${status === 'pending' || status === 'error' ? status : 'success'}`,
+                )
               }}
             </span>
           </div>
@@ -64,8 +68,8 @@ function dexNumber(id: number): string {
             <input
               v-model="query"
               type="search"
-              placeholder="Nom ou numéro…"
-              aria-label="Rechercher un Pokémon par nom ou numéro"
+              :placeholder="t('search.placeholder')"
+              :aria-label="t('search.ariaLabel')"
               autocomplete="off"
               :disabled="status === 'pending'"
             />
@@ -74,26 +78,25 @@ function dexNumber(id: number): string {
           <p v-if="apiError" class="full" role="alert">
             {{ apiError }}
             <button type="button" class="retry" @click="reload">
-              Réessayer
+              {{ t('errors.retry') }}
             </button>
           </p>
           <p v-else-if="isFull" class="full">
-            Wishlist pleine ({{ MAX_WISHLIST }}/{{ MAX_WISHLIST }}) : retire un
-            Pokémon pour en ajouter un autre.
+            {{ t('wishlist.full', { max: MAX_WISHLIST }) }}
           </p>
 
           <p v-if="status === 'error'" class="hint">
-            PokéAPI est injoignable pour le moment.
+            {{ t('search.pokeApiDown') }}
           </p>
           <p v-else-if="status === 'pending'" class="hint">
-            Chargement du Pokédex<span class="blink">_</span>
+            {{ t('search.loading') }}<span class="blink">_</span>
           </p>
-          <p v-else-if="!query" class="hint">
-            Essaie « pika », « salamèche » ou « 25 ».
+          <p v-else-if="!query" class="hint">{{ t('search.hint') }}</p>
+          <p v-else-if="!results.length" class="hint">
+            {{ t('search.noResult') }}
           </p>
-          <p v-else-if="!results.length" class="hint">Aucun Pokémon trouvé.</p>
 
-          <ul v-else class="results" aria-label="Résultats de recherche">
+          <ul v-else class="results" :aria-label="t('search.results')">
             <li v-for="p in results" :key="p.id">
               <button
                 type="button"
@@ -107,9 +110,9 @@ function dexNumber(id: number): string {
                 <span class="tile__name">{{ p.name }}</span>
                 <span class="tile__meta">{{
                   inList.has(p.id)
-                    ? 'Ajouté ✓'
+                    ? t('search.added')
                     : isFull
-                      ? 'Liste pleine'
+                      ? t('search.listFull')
                       : dexNumber(p.id)
                 }}</span>
               </button>
@@ -127,8 +130,17 @@ function dexNumber(id: number): string {
       <div class="bezel">
         <div class="screen">
           <div class="screen__label">
-            <span>Ma wishlist · {{ list.length }}/{{ MAX_WISHLIST }}</span>
-            <span>{{ caughtCount }} / {{ list.length }} capturés</span>
+            <span
+              >{{ t('wishlist.title') }} · {{ list.length }}/{{
+                MAX_WISHLIST
+              }}</span
+            >
+            <span>{{
+              t('wishlist.caughtCount', {
+                caught: caughtCount,
+                total: list.length,
+              })
+            }}</span>
           </div>
 
           <div
@@ -137,27 +149,24 @@ function dexNumber(id: number): string {
             :aria-valuenow="caughtCount"
             aria-valuemin="0"
             :aria-valuemax="list.length"
-            aria-label="Progression des captures"
+            :aria-label="t('wishlist.progress')"
           >
             <span :style="{ width: `${progress}%` }" />
           </div>
 
           <p v-if="listStatus === 'pending'" class="hint">
-            Connexion à l'API<span class="blink">_</span>
+            {{ t('wishlist.connecting') }}<span class="blink">_</span>
           </p>
 
           <div v-else-if="!list.length" class="empty">
             <span class="empty__ball" aria-hidden="true" />
-            <p v-if="listStatus === 'error'">
-              Impossible de charger la wishlist depuis l'API.
-            </p>
+            <p v-if="listStatus === 'error'">{{ t('wishlist.loadError') }}</p>
             <p v-else>
-              Ta wishlist est vide.<br />Cherche un Pokémon au-dessus pour
-              l'ajouter.
+              {{ t('wishlist.empty') }}<br />{{ t('wishlist.emptyHint') }}
             </p>
           </div>
 
-          <ul v-else class="wishlist" aria-label="Ma wishlist">
+          <ul v-else class="wishlist" :aria-label="t('wishlist.title')">
             <li
               v-for="p in list"
               :key="p.id"
@@ -167,7 +176,7 @@ function dexNumber(id: number): string {
               <div class="card__sprite">
                 <img
                   :src="spriteUrl(p.id)"
-                  :alt="p.name"
+                  :alt="displayName(p)"
                   width="80"
                   height="80"
                 />
@@ -176,9 +185,9 @@ function dexNumber(id: number): string {
                 <span class="card__num">{{ dexNumber(p.id) }}</span>
                 <NuxtLink
                   class="card__name"
-                  :to="`/pokemon/${p.id}`"
-                  :title="`Voir la fiche de ${p.name}`"
-                  >{{ p.name }}</NuxtLink
+                  :to="localePath(`/pokemon/${p.id}`)"
+                  :title="t('wishlist.viewSheet', { name: displayName(p) })"
+                  >{{ displayName(p) }}</NuxtLink
                 >
                 <button
                   type="button"
@@ -187,13 +196,13 @@ function dexNumber(id: number): string {
                   @click="toggle(p.id)"
                 >
                   <span class="catch__ball" aria-hidden="true" />
-                  {{ p.caught ? 'Capturé' : 'À capturer' }}
+                  {{ p.caught ? t('wishlist.caught') : t('wishlist.toCatch') }}
                 </button>
               </div>
               <button
                 type="button"
                 class="remove"
-                :aria-label="`Retirer ${p.name}`"
+                :aria-label="t('wishlist.remove', { name: displayName(p) })"
                 @click="remove(p.id)"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">

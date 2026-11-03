@@ -151,6 +151,14 @@ svg {
   text-shadow: 0 2px 0 var(--red-deep);
 }
 
+/* Sélecteur de langue : à droite, avant le nom de l'app */
+.top-bar .lang-switch {
+  margin-left: auto;
+}
+.top-bar .lang-switch + .brand {
+  margin-left: 4px;
+}
+
 @keyframes glow {
   50% {
     box-shadow:
@@ -252,6 +260,16 @@ svg {
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--ink-soft);
+}
+
+/* Les langues n'ont pas la même longueur (DE, ES) : on passe à la ligne
+   entre les deux libellés, jamais au milieu d'un libellé */
+.screen__label {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.screen__label > span {
+  white-space: nowrap;
 }
 
 .status::before {
@@ -656,6 +674,10 @@ a.card__name:focus-visible {
 
 /* ---------- Mobile ---------- */
 @media (max-width: 600px) {
+  /* Sur mobile, le sélecteur de langue prend la place du nom de l'app */
+  .top-bar .lang-switch + .brand {
+    display: none;
+  }
   body {
     padding-top: 24px;
   }

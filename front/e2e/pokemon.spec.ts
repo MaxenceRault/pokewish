@@ -4,7 +4,7 @@ test.describe('Fiche /pokemon/[name]', () => {
   test('une URL directe affiche le Pokémon et ses informations', async ({
     page,
   }) => {
-    await page.goto('/pokemon/25')
+    await page.goto('/fr/pokemon/25')
 
     await expect(
       page.getByRole('heading', { level: 1, name: 'Pikachu' }),
@@ -29,7 +29,7 @@ test.describe('Fiche /pokemon/[name]', () => {
   })
 
   test('marche aussi avec le nom anglais', async ({ page }) => {
-    await page.goto('/pokemon/pikachu')
+    await page.goto('/fr/pokemon/pikachu')
 
     await expect(
       page.getByRole('heading', { level: 1, name: 'Pikachu' }),
@@ -39,7 +39,7 @@ test.describe('Fiche /pokemon/[name]', () => {
   test('404 : Pokémon introuvable, avec un lien de retour', async ({
     page,
   }) => {
-    await page.goto('/pokemon/missingno')
+    await page.goto('/fr/pokemon/missingno')
 
     await expect(
       page.getByRole('heading', { name: 'Pokémon introuvable' }),
@@ -48,7 +48,7 @@ test.describe('Fiche /pokemon/[name]', () => {
     await expect(page).toHaveTitle('Pokémon introuvable · PokéWish')
 
     await page.getByRole('link', { name: 'Retour au Pokédex' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/fr')
   })
 
   test('depuis la wishlist, le nom mène à la fiche', async ({
@@ -61,7 +61,7 @@ test.describe('Fiche /pokemon/[name]', () => {
 
     await app.card('Pikachu').getByRole('link', { name: 'Pikachu' }).click()
 
-    await expect(page).toHaveURL('/pokemon/25')
+    await expect(page).toHaveURL('/fr/pokemon/25')
     await expect(
       page.getByRole('heading', { level: 1, name: 'Pikachu' }),
     ).toBeVisible()

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
+import { pickLanguage, t } from './i18n.js'
 import { wishlistRoutes } from './routes/wishlist.js'
 import type { ApiError } from './types.js'
 import { createWishlistStore, type WishlistStore } from './wishlist.js'
@@ -27,6 +28,16 @@ export function createApp(store: WishlistStore = createWishlistStore()) {
         '*',
         cors({ origin: (origin) => (isAllowedOrigin(origin) ? origin : null) }),
       )
+      // Les réponses dépendent de Accept-Language : on l'annonce aux caches
+      // (Vary) et on indique la langue choisie (Content-Language).
+      .use('*', async (c, next) => {
+        await next()
+        c.header(
+          'Content-Language',
+          pickLanguage(c.req.header('Accept-Language')),
+        )
+        c.header('Vary', 'Accept-Language', { append: true })
+      })
       .get('/health', (c) =>
         c.json<HealthResponse>({ status: 'ok', uptime: process.uptime() }),
       )
@@ -37,7 +48,7 @@ export function createApp(store: WishlistStore = createWishlistStore()) {
         if (error instanceof HTTPException) return error.getResponse()
         console.error(error)
         return c.json<ApiError>(
-          { error: 'INTERNAL', message: "Erreur interne de l'API." },
+          { error: 'INTERNAL', message: t(c, 'INTERNAL') },
           500,
         )
       })

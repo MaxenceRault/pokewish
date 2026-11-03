@@ -1,0 +1,87 @@
+{
+  "lang": {
+    "label": "Sprache"
+  },
+  "search": {
+    "label": "Suche",
+    "status": {
+      "pending": "Synchronisiere…",
+      "error": "Offline",
+      "success": "Online"
+    },
+    "placeholder": "Name oder Nummer…",
+    "ariaLabel": "Pokémon nach Name oder Nummer suchen",
+    "results": "Suchergebnisse",
+    "pokeApiDown": "PokéAPI ist gerade nicht erreichbar.",
+    "loading": "Pokédex wird geladen",
+    "hint": "Probier „pika“, „glumanda“ oder „25“.",
+    "noResult": "Kein Pokémon gefunden.",
+    "added": "Hinzugefügt ✓",
+    "listFull": "Liste voll"
+  },
+  "wishlist": {
+    "title": "Meine Wunschliste",
+    "caughtCount": "{caught} / {total} gefangen",
+    "progress": "Fangfortschritt",
+    "full": "Wunschliste voll ({max}/{max}): Entferne ein Pokémon, um ein anderes hinzuzufügen.",
+    "connecting": "Verbindung zur API",
+    "loadError": "Die Wunschliste konnte nicht von der API geladen werden.",
+    "empty": "Deine Wunschliste ist leer.",
+    "emptyHint": "Suche oben nach einem Pokémon, um es hinzuzufügen.",
+    "caught": "Gefangen",
+    "toCatch": "Zu fangen",
+    "viewSheet": "Steckbrief von {name} ansehen",
+    "remove": "{name} entfernen"
+  },
+  "errors": {
+    "network": "Die PokéWish-API ist nicht erreichbar. Starte `npm run dev` in back/.",
+    "http": "Die API hat mit {status} geantwortet.",
+    "unexpected": "Unerwarteter API-Fehler.",
+    "retry": "Erneut versuchen"
+  },
+  "pokemon": {
+    "back": "← Pokédex",
+    "sheet": "Steckbrief",
+    "data": "Daten",
+    "total": "Gesamt {total}",
+    "loading": "Analyse läuft",
+    "pokeApiDown": "PokéAPI ist gerade nicht erreichbar.",
+    "notFoundTitle": "Pokémon nicht gefunden",
+    "notFoundText": "Kein Pokémon passt zu „{name}“.",
+    "notFoundHint": "Probier einen englischen Namen (pikachu) oder eine Nummer (25).",
+    "backHome": "Zurück zum Pokédex",
+    "types": "Typen",
+    "height": "Größe",
+    "weight": "Gewicht",
+    "stats": "Basiswerte",
+    "noData": "Keine Daten vorhanden."
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Feuer",
+    "water": "Wasser",
+    "grass": "Pflanze",
+    "electric": "Elektro",
+    "ice": "Eis",
+    "fighting": "Kampf",
+    "poison": "Gift",
+    "ground": "Boden",
+    "flying": "Flug",
+    "psychic": "Psycho",
+    "bug": "Käfer",
+    "rock": "Gestein",
+    "ghost": "Geist",
+    "dragon": "Drache",
+    "dark": "Unlicht",
+    "steel": "Stahl",
+    "fairy": "Fee"
+  },
+  "stats": {
+    "hp": "KP",
+    "attack": "Angriff",
+    "defense": "Verteidigung",
+    "special-attack": "Sp.-Angr.",
+    "special-defense": "Sp.-Vert.",
+    "speed": "Initiative"
+  }
+}

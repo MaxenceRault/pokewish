@@ -45,21 +45,21 @@ export interface PokeApiPokemonResponse {
   species: { name: string; url: string }
 }
 
-/** Fiche d'un Pokémon, prête à afficher (en français). */
+/** Fiche d'un Pokémon, prête à afficher (textes dans la langue demandée). */
 export interface PokemonDetails extends Pokemon {
   /** Catégorie, ex. « Pokémon Souris » */
   genus: string | null
   /** Description du Pokédex la plus récente */
   description: string | null
-  /** Types en français, ex. ['Électrik'] (clés anglaises dans typeKeys) */
+  /** Clés des types, ex. ['fire', 'flying'] (libellés : fichiers i18n) */
   types: string[]
-  typeKeys: string[]
   /** En mètres */
   height: number
   /** En kilogrammes */
   weight: number
   image: string | null
-  stats: { key: string; label: string; value: number }[]
+  /** Clés des stats (hp, attack…) et valeurs de base */
+  stats: { key: string; value: number }[]
 }
 
 /** Réponse de l'API GraphQL de PokéAPI pour les noms d'espèces dans une langue */

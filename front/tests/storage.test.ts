@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // happy-dom fournit un vrai `localStorage` de navigateur pour ces tests.
 // La wishlist est dans l'API ; le localStorage ne garde plus que le cache
-// du Pokédex (noms français), pour ne pas rappeler PokéAPI à chaque visite.
+// du Pokédex (noms dans chaque langue), pour ne pas rappeler PokéAPI à chaque visite.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   loadDexCache,
@@ -9,8 +9,11 @@ import {
   saveDexCache,
   writeStorage,
 } from '../app/utils/storage'
-import { DEX_CACHE_KEY } from '../app/utils/wishlist'
+import { dexCacheKey } from '../app/utils/wishlist'
 import type { Pokemon } from '../app/types/pokemon'
+
+// Le cache existe par langue ; ces tests utilisent celui du français
+const KEY = dexCacheKey('fr')
 
 const dex: Pokemon[] = [
   { id: 1, name: 'Bulbizarre' },
@@ -27,38 +30,40 @@ afterEach(() => {
 
 describe('sauvegarde', () => {
   it('écrit le Pokédex en JSON sous la bonne clé', () => {
-    expect(saveDexCache(dex)).toBe(true)
-    expect(JSON.parse(localStorage.getItem(DEX_CACHE_KEY)!)).toEqual(dex)
+    expect(saveDexCache('fr', dex)).toBe(true)
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(dex)
+    // une autre langue a son propre cache
+    expect(loadDexCache('de')).toEqual([])
   })
 
   it('écrase la sauvegarde précédente', () => {
-    saveDexCache(dex)
-    saveDexCache([dex[1]!])
-    expect(loadDexCache()).toEqual([dex[1]])
+    saveDexCache('fr', dex)
+    saveDexCache('fr', [dex[1]!])
+    expect(loadDexCache('fr')).toEqual([dex[1]])
   })
 })
 
 describe('lecture', () => {
   it('relit exactement ce qui a été sauvegardé (accents compris)', () => {
-    saveDexCache(dex)
-    expect(loadDexCache()).toEqual(dex)
+    saveDexCache('fr', dex)
+    expect(loadDexCache('fr')).toEqual(dex)
   })
 
   it('relit un cache écrit à la main', () => {
-    localStorage.setItem(DEX_CACHE_KEY, '[{"id":133,"name":"Évoli"}]')
-    expect(loadDexCache()).toEqual([{ id: 133, name: 'Évoli' }])
+    localStorage.setItem(KEY, '[{"id":133,"name":"Évoli"}]')
+    expect(loadDexCache('fr')).toEqual([{ id: 133, name: 'Évoli' }])
   })
 })
 
 describe('stockage vide', () => {
   it('renvoie [] si rien n’a jamais été sauvegardé', () => {
-    expect(localStorage.getItem(DEX_CACHE_KEY)).toBeNull()
-    expect(loadDexCache()).toEqual([])
+    expect(localStorage.getItem(KEY)).toBeNull()
+    expect(loadDexCache('fr')).toEqual([])
   })
 
   it('renvoie [] pour une valeur vide', () => {
-    localStorage.setItem(DEX_CACHE_KEY, '')
-    expect(loadDexCache()).toEqual([])
+    localStorage.setItem(KEY, '')
+    expect(loadDexCache('fr')).toEqual([])
   })
 })
 
@@ -71,17 +76,17 @@ describe('JSON invalide', () => {
     ['un objet au lieu d’une liste', '{"id":1}'],
     ['une liste de nombres', '[1,2,3]'],
   ])('%s : renvoie [] sans lever d’erreur', (_, raw) => {
-    localStorage.setItem(DEX_CACHE_KEY, raw)
-    expect(() => loadDexCache()).not.toThrow()
-    expect(loadDexCache()).toEqual([])
+    localStorage.setItem(KEY, raw)
+    expect(() => loadDexCache('fr')).not.toThrow()
+    expect(loadDexCache('fr')).toEqual([])
   })
 
   it('ignore seulement les entrées invalides et garde les bonnes', () => {
     localStorage.setItem(
-      DEX_CACHE_KEY,
+      KEY,
       JSON.stringify([{ id: 1, name: 'Bulbizarre' }, { id: '4' }, null]),
     )
-    expect(loadDexCache()).toEqual([{ id: 1, name: 'Bulbizarre' }])
+    expect(loadDexCache('fr')).toEqual([{ id: 1, name: 'Bulbizarre' }])
   })
 })
 
@@ -90,15 +95,15 @@ describe('stockage inaccessible (navigation privée, quota plein…)', () => {
     vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
       throw new DOMException('Accès refusé', 'SecurityError')
     })
-    expect(readStorage(DEX_CACHE_KEY)).toBeNull()
-    expect(loadDexCache()).toEqual([])
+    expect(readStorage(KEY)).toBeNull()
+    expect(loadDexCache('fr')).toEqual([])
   })
 
   it('écriture impossible : renvoie false au lieu de planter', () => {
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('Quota dépassé', 'QuotaExceededError')
     })
-    expect(saveDexCache(dex)).toBe(false)
+    expect(saveDexCache('fr', dex)).toBe(false)
     expect(writeStorage('x', 'y')).toBe(false)
   })
 })

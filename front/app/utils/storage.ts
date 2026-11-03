@@ -1,5 +1,5 @@
 import type { Pokemon } from '~/types/pokemon'
-import { DEX_CACHE_KEY, parsePokemonList } from './wishlist'
+import { dexCacheKey, parsePokemonList } from './wishlist'
 
 // Le stockage peut être absent (rendu serveur) ou lever une erreur
 // (navigation privée, stockage bloqué, quota plein) : on ne plante jamais.
@@ -27,10 +27,14 @@ export function writeStorage(
   }
 }
 
-export function loadDexCache(storage?: Storage): Pokemon[] {
-  return parsePokemonList(readStorage(DEX_CACHE_KEY, storage))
+export function loadDexCache(lang: string, storage?: Storage): Pokemon[] {
+  return parsePokemonList(readStorage(dexCacheKey(lang), storage))
 }
 
-export function saveDexCache(dex: Pokemon[], storage?: Storage): boolean {
-  return writeStorage(DEX_CACHE_KEY, JSON.stringify(dex), storage)
+export function saveDexCache(
+  lang: string,
+  dex: Pokemon[],
+  storage?: Storage,
+): boolean {
+  return writeStorage(dexCacheKey(lang), JSON.stringify(dex), storage)
 }

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { formatDexNumber } from '~/utils/format'
 
-// /pokemon/pikachu ou /pokemon/25 (nom anglais ou numéro, comme PokéAPI)
+// /pokemon/pikachu ou /pokemon/25 (nom anglais ou numéro, comme PokéAPI),
+// préfixé par la langue sauf en anglais : /fr/pokemon/25
 const route = useRoute()
 const param = computed(() => String(route.params.name))
+const { t, locale } = useI18n()
+const localePath = useLocalePath()
 
 // Chargée dans le navigateur, comme la recherche : PokéAPI est appelée
 // directement par le client (et simulable dans les tests e2e).
@@ -12,8 +15,8 @@ const {
   status,
   refresh,
 } = useAsyncData(
-  () => `pokemon-${param.value}`,
-  () => fetchPokemonDetails(param.value),
+  () => `pokemon-${param.value}-${locale.value}`,
+  () => fetchPokemonDetails(param.value, locale.value),
   { server: false },
 )
 
@@ -25,7 +28,7 @@ useHead(() => ({
   title: pokemon.value
     ? `${pokemon.value.name} · PokéWish`
     : notFound.value
-      ? 'Pokémon introuvable · PokéWish'
+      ? `${t('pokemon.notFoundTitle')} · PokéWish`
       : 'PokéWish',
 }))
 
@@ -58,7 +61,7 @@ const total = computed(
   () => pokemon.value?.stats.reduce((sum, s) => sum + s.value, 0) ?? 0,
 )
 
-const format = (n: number) => n.toLocaleString('fr-FR')
+const format = (n: number) => n.toLocaleString(locale.value)
 </script>
 
 <template>
@@ -68,36 +71,41 @@ const format = (n: number) => n.toLocaleString('fr-FR')
       <header class="top-bar">
         <span class="lens" aria-hidden="true" />
         <span class="leds" aria-hidden="true"><i /><i /><i /></span>
-        <NuxtLink to="/" class="back">← Pokédex</NuxtLink>
+        <LangSwitcher class="lang-switch" />
+        <NuxtLink :to="localePath('/')" class="back">{{
+          t('pokemon.back')
+        }}</NuxtLink>
       </header>
 
       <div class="bezel">
         <span class="bezel__dots" aria-hidden="true"><i /><i /></span>
         <div class="screen">
           <div class="screen__label">
-            <span>Fiche</span>
+            <span>{{ t('pokemon.sheet') }}</span>
             <span v-if="pokemon">{{ formatDexNumber(pokemon.id) }}</span>
           </div>
 
           <p v-if="status === 'pending' || status === 'idle'" class="hint">
-            Analyse en cours<span class="blink">_</span>
+            {{ t('pokemon.loading') }}<span class="blink">_</span>
           </p>
 
           <div v-else-if="status === 'error'" class="full" role="alert">
-            PokéAPI est injoignable pour le moment.
+            {{ t('pokemon.pokeApiDown') }}
             <button type="button" class="retry" @click="() => refresh()">
-              Réessayer
+              {{ t('errors.retry') }}
             </button>
           </div>
 
           <div v-else-if="notFound" class="empty" role="alert">
             <span class="empty__ball" aria-hidden="true" />
-            <h1 class="sheet__title">Pokémon introuvable</h1>
+            <h1 class="sheet__title">{{ t('pokemon.notFoundTitle') }}</h1>
             <p>
-              Aucun Pokémon ne correspond à « {{ param }} ».<br />
-              Essaie un nom anglais (pikachu) ou un numéro (25).
+              {{ t('pokemon.notFoundText', { name: param }) }}<br />
+              {{ t('pokemon.notFoundHint') }}
             </p>
-            <NuxtLink to="/" class="retry">Retour au Pokédex</NuxtLink>
+            <NuxtLink :to="localePath('/')" class="retry">{{
+              t('pokemon.backHome')
+            }}</NuxtLink>
           </div>
 
           <div v-else-if="pokemon" class="sheet">
@@ -114,24 +122,22 @@ const format = (n: number) => n.toLocaleString('fr-FR')
               <p v-if="pokemon.genus" class="sheet__genus">
                 {{ pokemon.genus }}
               </p>
-              <ul class="types" aria-label="Types">
+              <ul class="types" :aria-label="t('pokemon.types')">
                 <li
-                  v-for="(type, i) in pokemon.types"
+                  v-for="type in pokemon.types"
                   :key="type"
-                  :style="{
-                    background: TYPE_COLORS[pokemon.typeKeys[i] ?? ''],
-                  }"
+                  :style="{ background: TYPE_COLORS[type] }"
                 >
-                  {{ type }}
+                  {{ t(`types.${type}`) }}
                 </li>
               </ul>
               <dl class="measures">
                 <div>
-                  <dt>Taille</dt>
+                  <dt>{{ t('pokemon.height') }}</dt>
                   <dd>{{ format(pokemon.height) }} m</dd>
                 </div>
                 <div>
-                  <dt>Poids</dt>
+                  <dt>{{ t('pokemon.weight') }}</dt>
                   <dd>{{ format(pokemon.weight) }} kg</dd>
                 </div>
               </dl>
@@ -149,8 +155,8 @@ const format = (n: number) => n.toLocaleString('fr-FR')
       <div class="bezel">
         <div class="screen">
           <div class="screen__label">
-            <span>Données</span>
-            <span v-if="pokemon">Total {{ total }}</span>
+            <span>{{ t('pokemon.data') }}</span>
+            <span v-if="pokemon">{{ t('pokemon.total', { total }) }}</span>
           </div>
 
           <template v-if="pokemon">
@@ -158,9 +164,9 @@ const format = (n: number) => n.toLocaleString('fr-FR')
               {{ pokemon.description }}
             </p>
 
-            <ul class="stats" aria-label="Statistiques de base">
+            <ul class="stats" :aria-label="t('pokemon.stats')">
               <li v-for="stat in pokemon.stats" :key="stat.key">
-                <span class="stats__label">{{ stat.label }}</span>
+                <span class="stats__label">{{ t(`stats.${stat.key}`) }}</span>
                 <span class="stats__value">{{ stat.value }}</span>
                 <span class="stats__bar" aria-hidden="true">
                   <span
@@ -170,7 +176,7 @@ const format = (n: number) => n.toLocaleString('fr-FR')
               </li>
             </ul>
           </template>
-          <p v-else class="hint">Aucune donnée à afficher.</p>
+          <p v-else class="hint">{{ t('pokemon.noData') }}</p>
         </div>
       </div>
 
@@ -184,8 +190,11 @@ const format = (n: number) => n.toLocaleString('fr-FR')
 </template>
 
 <style scoped>
-.back {
+.lang-switch {
   margin-left: auto;
+}
+
+.back {
   padding: 6px 12px;
   border-radius: 999px;
   background: rgb(0 0 0 / 0.18);

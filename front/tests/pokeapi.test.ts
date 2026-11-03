@@ -3,7 +3,7 @@ import {
   fetchPokemon,
   fetchPokemonDetails,
   fetchPokemonList,
-  fetchPokemonListFr,
+  fetchPokemonNames,
   PokeApiError,
   POKEAPI_GRAPHQL_URL,
   POKEAPI_URL,
@@ -42,8 +42,8 @@ afterEach(() => {
 })
 
 describe('fetchPokemon', () => {
-  it('réponse 200 : renvoie le Pokémon avec son nom français', async () => {
-    fetchMock.mockResolvedValueOnce(
+  it('réponse 200 : renvoie le Pokémon avec son nom dans la langue demandée', async () => {
+    fetchMock.mockImplementation(async () =>
       jsonResponse(
         species(4, 'charmander', {
           en: 'Charmander',
@@ -53,21 +53,40 @@ describe('fetchPokemon', () => {
       ),
     )
 
-    await expect(fetchPokemon('charmander')).resolves.toEqual({
+    await expect(fetchPokemon('charmander', 'fr')).resolves.toEqual({
       id: 4,
       name: 'Salamèche',
     })
-    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+    await expect(fetchPokemon('charmander', 'de')).resolves.toMatchObject({
+      name: 'Glumanda',
+    })
+    // anglais par défaut
+    await expect(fetchPokemon('charmander')).resolves.toMatchObject({
+      name: 'Charmander',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
       `${POKEAPI_URL}/pokemon-species/charmander`,
     )
   })
 
-  it("garde le nom anglais s'il n'y a pas de traduction française", async () => {
+  it("prend le nom anglais s'il n'y a pas de traduction", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(species(25, 'pikachu', { en: 'Pikachu' })),
     )
 
-    await expect(fetchPokemon(25)).resolves.toEqual({ id: 25, name: 'pikachu' })
+    await expect(fetchPokemon(25, 'es')).resolves.toEqual({
+      id: 25,
+      name: 'Pikachu',
+    })
+  })
+
+  it("garde l'identifiant PokéAPI s'il n'y a aucun nom", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(species(25, 'pikachu', {})))
+
+    await expect(fetchPokemon(25, 'fr')).resolves.toEqual({
+      id: 25,
+      name: 'pikachu',
+    })
   })
 
   it('Pokémon introuvable (404) : renvoie null', async () => {
@@ -109,7 +128,7 @@ describe('fetchPokemon', () => {
   })
 })
 
-describe('fetchPokemonListFr (GraphQL)', () => {
+describe('fetchPokemonNames (GraphQL)', () => {
   it('réponse 200 : renvoie les noms français en { id, name }', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
@@ -122,7 +141,7 @@ describe('fetchPokemonListFr (GraphQL)', () => {
       }),
     )
 
-    await expect(fetchPokemonListFr()).resolves.toEqual([
+    await expect(fetchPokemonNames('fr')).resolves.toEqual([
       { id: 1, name: 'Bulbizarre' },
       { id: 4, name: 'Salamèche' },
     ])
@@ -130,13 +149,16 @@ describe('fetchPokemonListFr (GraphQL)', () => {
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe(POKEAPI_GRAPHQL_URL)
     expect(init?.method).toBe('POST')
-    expect(String(init?.body)).toContain('\\"fr\\"')
+    // la langue part en variable GraphQL, pas collée dans la requête
+    expect(JSON.parse(String(init?.body)).variables).toEqual({ lang: 'fr' })
   })
 
   it('erreur HTTP : lève une PokeApiError', async () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 429 }))
 
-    await expect(fetchPokemonListFr()).rejects.toMatchObject({ status: 429 })
+    await expect(fetchPokemonNames('fr')).rejects.toMatchObject({
+      status: 429,
+    })
   })
 
   it('erreur GraphQL (réponse 200 avec errors) : lève une erreur', async () => {
@@ -144,7 +166,7 @@ describe('fetchPokemonListFr (GraphQL)', () => {
       jsonResponse({ errors: [{ message: 'field not found' }] }),
     )
 
-    await expect(fetchPokemonListFr()).rejects.toThrow('field not found')
+    await expect(fetchPokemonNames('fr')).rejects.toThrow('field not found')
   })
 })
 
@@ -217,32 +239,47 @@ describe('fetchPokemonDetails (fiche /pokemon/[name])', () => {
     ],
   }
 
-  it('réponse 200 : fiche en français, unités converties', async () => {
+  it('réponse 200 : textes dans la langue demandée, unités converties', async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(pokemonData))
       .mockResolvedValueOnce(jsonResponse(speciesData))
 
-    await expect(fetchPokemonDetails('Charizard')).resolves.toEqual({
+    await expect(fetchPokemonDetails('Charizard', 'fr')).resolves.toEqual({
       id: 6,
       name: 'Dracaufeu',
       genus: 'Pokémon Flamme',
       // la description française la plus récente, sans retours à la ligne
       description: 'Crache du feu à très haute température.',
-      // dans l'ordre des slots, traduits
-      types: ['Feu', 'Vol'],
-      typeKeys: ['fire', 'flying'],
+      // clés dans l'ordre des slots (libellés : fichiers de traduction)
+      types: ['fire', 'flying'],
       height: 1.7, // 17 décimètres
       weight: 90.5, // 905 hectogrammes
       image: 'https://img.test/art/6.png',
       stats: [
-        { key: 'hp', label: 'PV', value: 78 },
-        { key: 'special-attack', label: 'Atq. Spé.', value: 109 },
+        { key: 'hp', value: 78 },
+        { key: 'special-attack', value: 109 },
       ],
     })
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `${POKEAPI_URL}/pokemon/charizard`,
       `${POKEAPI_URL}/pokemon-species/6/`,
     ])
+  })
+
+  it('anglais par défaut, et repli sur l’anglais pour une langue absente', async () => {
+    fetchMock.mockImplementation(async (url) =>
+      jsonResponse(String(url).includes('species') ? speciesData : pokemonData),
+    )
+
+    await expect(fetchPokemonDetails(6)).resolves.toMatchObject({
+      name: 'Charizard',
+      genus: 'Flame Pokémon',
+      description: 'Spits fire.',
+    })
+    // pas de textes en allemand dans speciesData : repli sur l'anglais
+    await expect(fetchPokemonDetails(6, 'de')).resolves.toMatchObject({
+      name: 'Charizard',
+    })
   })
 
   it('Pokémon introuvable (404) : renvoie null sans appeler l’espèce', async () => {
@@ -261,7 +298,7 @@ describe('fetchPokemonDetails (fiche /pokemon/[name])', () => {
       name: 'charizard',
       genus: null,
       description: null,
-      types: ['Feu', 'Vol'],
+      types: ['fire', 'flying'],
     })
   })
 
