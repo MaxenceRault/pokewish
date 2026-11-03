@@ -312,6 +312,12 @@ jobs:
     needs: [deploy-lambda, build]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Secrets et variable Vercel rangés dans l'environnement GitHub « prod ».
+    # (Pas sur deploy-lambda : un environnement change l'identité OIDC envoyée
+    # à AWS, qui n'accepte que …:ref:refs/heads/main.)
+    environment:
+      name: prod
+      url: ${{ vars.FRONT_URL }}
     concurrency:
       group: deploy-vercel
       cancel-in-progress: false
