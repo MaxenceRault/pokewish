@@ -19,6 +19,24 @@ describe('pickLanguage (Accept-Language)', () => {
   })
 })
 
+describe('fichiers src/locales/*.json', () => {
+  it('les 4 langues ont exactement les mêmes clés que l’anglais', async () => {
+    const keysOf = async (lang: string) =>
+      Object.keys(
+        (
+          await import(`../src/locales/${lang}.json`, {
+            with: { type: 'json' },
+          })
+        ).default,
+      ).sort()
+
+    const reference = await keysOf('en')
+    for (const lang of LANGUAGES) {
+      expect(await keysOf(lang), lang).toEqual(reference)
+    }
+  })
+})
+
 describe('translate', () => {
   it('remplace les paramètres', () => {
     expect(translate('fr', 'NOT_FOUND', { id: 25 })).toBe(

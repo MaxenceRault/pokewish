@@ -1,52 +1,19 @@
 import type { Context } from 'hono'
+import de from './locales/de.json' with { type: 'json' }
+import en from './locales/en.json' with { type: 'json' }
+import es from './locales/es.json' with { type: 'json' }
+import fr from './locales/fr.json' with { type: 'json' }
 
 // Langues de l'API, les mêmes que le front. Anglais par défaut.
 export const LANGUAGES = ['en', 'fr', 'es', 'de'] as const
 export type Lang = (typeof LANGUAGES)[number]
 export const DEFAULT_LANG: Lang = 'en'
 
-const MESSAGES = {
-  en: {
-    INVALID_ID: 'The id must be a positive integer.',
-    INVALID_POKEMON_BODY: 'Expected: { "id": positive integer, "name": text }.',
-    INVALID_CAUGHT_BODY: 'Expected: { "caught": boolean }.',
-    DUPLICATE: 'This Pokémon is already in the wishlist.',
-    WISHLIST_FULL: 'The wishlist is full (6 Pokémon maximum).',
-    NOT_FOUND: 'Pokémon #{id} is not in the wishlist.',
-    INTERNAL: 'Internal API error.',
-  },
-  fr: {
-    INVALID_ID: "L'id doit être un entier positif.",
-    INVALID_POKEMON_BODY: 'Attendu : { "id": entier positif, "name": texte }.',
-    INVALID_CAUGHT_BODY: 'Attendu : { "caught": booléen }.',
-    DUPLICATE: 'Ce Pokémon est déjà dans la wishlist.',
-    WISHLIST_FULL: 'La wishlist est pleine (6 Pokémon maximum).',
-    NOT_FOUND: "Le Pokémon n°{id} n'est pas dans la wishlist.",
-    INTERNAL: "Erreur interne de l'API.",
-  },
-  es: {
-    INVALID_ID: 'El id debe ser un número entero positivo.',
-    INVALID_POKEMON_BODY:
-      'Se esperaba: { "id": entero positivo, "name": texto }.',
-    INVALID_CAUGHT_BODY: 'Se esperaba: { "caught": booleano }.',
-    DUPLICATE: 'Este Pokémon ya está en la lista de deseos.',
-    WISHLIST_FULL: 'La lista de deseos está llena (6 Pokémon como máximo).',
-    NOT_FOUND: 'El Pokémon n.º {id} no está en la lista de deseos.',
-    INTERNAL: 'Error interno de la API.',
-  },
-  de: {
-    INVALID_ID: 'Die ID muss eine positive ganze Zahl sein.',
-    INVALID_POKEMON_BODY:
-      'Erwartet: { "id": positive ganze Zahl, "name": Text }.',
-    INVALID_CAUGHT_BODY: 'Erwartet: { "caught": Boolean }.',
-    DUPLICATE: 'Dieses Pokémon ist bereits auf der Wunschliste.',
-    WISHLIST_FULL: 'Die Wunschliste ist voll (maximal 6 Pokémon).',
-    NOT_FOUND: 'Pokémon Nr. {id} ist nicht auf der Wunschliste.',
-    INTERNAL: 'Interner API-Fehler.',
-  },
-} satisfies Record<Lang, Record<string, string>>
+// Un fichier de messages par langue : src/locales/{en,fr,es,de}.json.
+// Le typage impose à chaque langue toutes les clés de l'anglais.
+const MESSAGES: Record<Lang, typeof en> = { en, fr, es, de }
 
-export type MessageKey = keyof (typeof MESSAGES)['en']
+export type MessageKey = keyof typeof en
 
 const isLang = (code: string): code is Lang =>
   (LANGUAGES as readonly string[]).includes(code)

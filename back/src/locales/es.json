@@ -1,0 +1,9 @@
+{
+  "INVALID_ID": "El id debe ser un número entero positivo.",
+  "INVALID_POKEMON_BODY": "Se esperaba: { \"id\": entero positivo, \"name\": texto }.",
+  "INVALID_CAUGHT_BODY": "Se esperaba: { \"caught\": booleano }.",
+  "DUPLICATE": "Este Pokémon ya está en la lista de deseos.",
+  "WISHLIST_FULL": "La lista de deseos está llena (6 Pokémon como máximo).",
+  "NOT_FOUND": "El Pokémon n.º {id} no está en la lista de deseos.",
+  "INTERNAL": "Error interno de la API."
+}
