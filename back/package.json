@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
-    "test:db": "node --env-file=.env node_modules/vitest/vitest.mjs run tests/db",
+    "test:db": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run tests/db",
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist-lambda/index.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "deploy:lambda": "bash scripts/deploy-lambda.sh",
     "package:lambda": "npm run build:lambda --silent && rm -f lambda.zip && cd dist-lambda && zip -q ../lambda.zip index.mjs"

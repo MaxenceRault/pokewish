@@ -58,24 +58,14 @@ L'API tourne sur **AWS Lambda** derrière **API Gateway** (HTTP API), région
 `eu-north-1` comme la base Supabase. Même app Hono que le serveur Node : seul
 le point d'entrée change ([back/src/lambda.ts](back/src/lambda.ts)).
 
-**Déploiement continu** : à chaque push sur `main`, une fois tous les contrôles
-verts, le job CI « Déploiement AWS Lambda » met à jour le code de la Lambda
-puis vérifie `/health` et `/wishlist`. GitHub s'authentifie auprès d'AWS par
-**OIDC** : aucune clé AWS n'est stockée dans GitHub. Le rôle utilisé ne peut
-que mettre à jour le code de cette Lambda
-([back/aws/github-deploy-policy.json](back/aws/github-deploy-policy.json)), et
-seulement depuis `main` ([back/aws/github-deploy-trust.json](back/aws/github-deploy-trust.json)).
-
-À faire une seule fois, à la main :
+Le déploiement est **manuel** (la CI vérifie seulement que le paquet Lambda
+se construit) :
 
 ```bash
-cd back
-npm run deploy:lambda                  # crée la Lambda et l'API Gateway
-bash scripts/setup-github-deploy.sh    # autorise GitHub Actions (OIDC + rôle)
+cd back && npm run deploy:lambda
 ```
 
-`npm run deploy:lambda` reste utile pour changer la configuration de la
-Lambda. Il est rejouable : il construit le paquet, crée ou met à jour le rôle
+Le script est rejouable : il construit le paquet, crée ou met à jour le rôle
 IAM, la Lambda et l'API Gateway, puis vérifie `/health` et `/wishlist`. Il lit
 `back/.env` et passe à la Lambda :
 

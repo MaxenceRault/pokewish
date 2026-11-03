@@ -2,9 +2,8 @@
 # Déploie l'API Hono sur AWS Lambda + API Gateway (HTTP API).
 # Rejouable : crée ce qui manque, met à jour le reste.
 #
-# À lancer à la main pour créer l'infrastructure ou changer sa configuration
-# (DATABASE_URL, CORS). Ensuite, chaque push sur main met à jour le CODE de la
-# Lambda via la CI (job « Déploiement AWS Lambda »).
+# Déploiement manuel (la CI ne déploie pas l'API) : à relancer après chaque
+# modification de l'API ou de sa configuration (DATABASE_URL, CORS).
 #
 #   cd back && npm run deploy:lambda
 #
