@@ -9,7 +9,9 @@ import { MAX_WISHLIST, type WishlistStore } from './wishlist.js'
  *   connexions courtes). Il ne gère pas les requêtes préparées : on les coupe.
  */
 export function connect(url: string, options: { max?: number } = {}): Sql {
-  const transactionPooler = new URL(url).port === '6543'
+  // Simple test sur le texte : ne plante pas sur une URL vide (tests sans
+  // base, où la connexion est créée mais jamais ouverte)
+  const transactionPooler = /:6543(\/|$)/.test(url)
   return postgres(url, {
     // prefer : SSL si le serveur le propose (Supabase), sinon en clair (CI locale)
     ssl: 'prefer',
