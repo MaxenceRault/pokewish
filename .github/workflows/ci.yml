@@ -298,7 +298,12 @@ jobs:
           fail-on-cache-miss: true
       # Réglages et variables (NUXT_PUBLIC_API_BASE…) du projet Vercel
       - run: npx vercel@65 pull --yes --environment=production --token="$VERCEL_TOKEN"
+      # Hors des serveurs Vercel, Nuxt ne détecte pas Vercel tout seul :
+      # on force le format attendu (.vercel/output, fonctions SSR)
       - run: npx vercel@65 build --prod --token="$VERCEL_TOKEN"
+        env:
+          NITRO_PRESET: vercel
+          NUXT_PUBLIC_API_BASE: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
       - run: npx vercel@65 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
       # Le HTML d'une fiche doit sortir du serveur déjà rempli (SSR)
       - name: Vérification SSR (/pokemon/25)
