@@ -171,14 +171,15 @@ describe('PATCH /wishlist/:id', () => {
 })
 
 describe('CORS', () => {
-  it('autorise le front en local', async () => {
-    const res = await app.request('/wishlist', {
-      headers: { Origin: 'http://localhost:3000' },
-    })
+  // 3000 : npm run dev ; 3100 : front des tests e2e ; 127.0.0.1 : même machine
+  it.each([
+    'http://localhost:3000',
+    'http://localhost:3100',
+    'http://127.0.0.1:3000',
+  ])('autorise le front local %s', async (origin) => {
+    const res = await app.request('/wishlist', { headers: { Origin: origin } })
 
-    expect(res.headers.get('access-control-allow-origin')).toBe(
-      'http://localhost:3000',
-    )
+    expect(res.headers.get('access-control-allow-origin')).toBe(origin)
   })
 
   it("n'autorise pas une origine inconnue", async () => {
