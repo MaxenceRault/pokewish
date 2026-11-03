@@ -23,6 +23,44 @@ const PIXEL = Buffer.from(
   'base64',
 )
 
+/** Fiche PokéAPI de Pikachu (réponses /pokemon/25 et /pokemon-species/25). */
+const PIKACHU = {
+  id: 25,
+  name: 'pikachu',
+  height: 4,
+  weight: 60,
+  types: [{ slot: 1, type: { name: 'electric' } }],
+  stats: [
+    { base_stat: 35, stat: { name: 'hp' } },
+    { base_stat: 55, stat: { name: 'attack' } },
+    { base_stat: 90, stat: { name: 'speed' } },
+  ],
+  sprites: {
+    front_default: 'https://raw.githubusercontent.com/sprites/25.png',
+    other: {
+      'official-artwork': {
+        front_default: 'https://raw.githubusercontent.com/art/25.png',
+      },
+    },
+  },
+  species: {
+    name: 'pikachu',
+    url: 'https://pokeapi.co/api/v2/pokemon-species/25/',
+  },
+}
+const PIKACHU_SPECIES = {
+  id: 25,
+  name: 'pikachu',
+  names: [{ name: 'Pikachu', language: { name: 'fr' } }],
+  genera: [{ genus: 'Pokémon Souris', language: { name: 'fr' } }],
+  flavor_text_entries: [
+    {
+      flavor_text: 'Il stocke\nde l’électricité dans ses joues.',
+      language: { name: 'fr' },
+    },
+  ],
+}
+
 /** Simule PokéAPI, les sprites et les polices : aucun appel réseau externe. */
 async function mockExternal(page: Page): Promise<void> {
   await page.route('https://beta.pokeapi.co/graphql/**', (route) =>
@@ -39,6 +77,20 @@ async function mockExternal(page: Page): Promise<void> {
   )
   await page.route('https://pokeapi.co/**', (route) =>
     route.fulfill({ status: 500 }),
+  )
+  // Fiches /pokemon/[name] : seul Pikachu existe (par nom ou numéro), sinon 404
+  await page.route(
+    /pokeapi\.co\/api\/v2\/pokemon(-species)?\/([^/?]+)\/?$/,
+    (route) => {
+      const [, species, key] = route
+        .request()
+        .url()
+        .match(/pokemon(-species)?\/([^/?]+)\/?$/)!
+      if (key !== '25' && key !== 'pikachu') {
+        return route.fulfill({ status: 404, body: 'Not Found' })
+      }
+      return route.fulfill({ json: species ? PIKACHU_SPECIES : PIKACHU })
+    },
   )
   await page.route('https://raw.githubusercontent.com/**', (route) =>
     route.fulfill({ body: PIXEL, contentType: 'image/png' }),
@@ -72,7 +124,19 @@ export const test = base.extend<{
   api: WishlistApi
   app: PokewishPage
   pageErrors: string[]
+  pokeApi: undefined
 }>({
+  // PokéAPI, sprites et polices simulés pour TOUS les tests : aucun ne peut
+  // appeler le vrai réseau par oubli. Un test peut ajouter ses propres
+  // page.route(), qui passent avant (les plus récentes gagnent).
+  pokeApi: [
+    async ({ page }, use) => {
+      await mockExternal(page)
+      await use(undefined)
+    },
+    { auto: true },
+  ],
+
   // Chaque test part d'une wishlist vide côté API — même ceux qui n'utilisent
   // pas `api` (auto), sinon un test hériterait de l'état du précédent
   api: [
@@ -118,8 +182,6 @@ export const test = base.extend<{
   ],
 
   app: async ({ page }, use) => {
-    await mockExternal(page)
-
     const search = page.getByRole('searchbox', {
       name: 'Rechercher un Pokémon par nom ou numéro',
     })

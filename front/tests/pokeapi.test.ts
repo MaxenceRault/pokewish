@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchPokemon,
+  fetchPokemonDetails,
   fetchPokemonList,
   fetchPokemonListFr,
   PokeApiError,
@@ -172,5 +173,101 @@ describe('fetchPokemonList (secours, noms anglais)', () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 503 }))
 
     await expect(fetchPokemonList()).rejects.toBeInstanceOf(PokeApiError)
+  })
+})
+
+describe('fetchPokemonDetails (fiche /pokemon/[name])', () => {
+  /** Réponse de /pokemon/{id} : données de combat, en anglais. */
+  const pokemonData = {
+    id: 6,
+    name: 'charizard',
+    height: 17,
+    weight: 905,
+    types: [
+      { slot: 2, type: { name: 'flying' } },
+      { slot: 1, type: { name: 'fire' } },
+    ],
+    stats: [
+      { base_stat: 78, stat: { name: 'hp' } },
+      { base_stat: 109, stat: { name: 'special-attack' } },
+    ],
+    sprites: {
+      front_default: 'https://img.test/6.png',
+      other: {
+        'official-artwork': { front_default: 'https://img.test/art/6.png' },
+      },
+    },
+    species: { name: 'charizard', url: `${POKEAPI_URL}/pokemon-species/6/` },
+  }
+
+  /** Réponse de /pokemon-species/{id} : textes, dont le français. */
+  const speciesData = {
+    ...species(6, 'charizard', { en: 'Charizard', fr: 'Dracaufeu' }),
+    genera: [
+      { genus: 'Flame Pokémon', language: { name: 'en' } },
+      { genus: 'Pokémon Flamme', language: { name: 'fr' } },
+    ],
+    flavor_text_entries: [
+      { flavor_text: 'Ancienne\ndescription.', language: { name: 'fr' } },
+      { flavor_text: 'Spits fire.', language: { name: 'en' } },
+      {
+        flavor_text: 'Crache du feu\nà très haute\ftempérature.',
+        language: { name: 'fr' },
+      },
+    ],
+  }
+
+  it('réponse 200 : fiche en français, unités converties', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(pokemonData))
+      .mockResolvedValueOnce(jsonResponse(speciesData))
+
+    await expect(fetchPokemonDetails('Charizard')).resolves.toEqual({
+      id: 6,
+      name: 'Dracaufeu',
+      genus: 'Pokémon Flamme',
+      // la description française la plus récente, sans retours à la ligne
+      description: 'Crache du feu à très haute température.',
+      // dans l'ordre des slots, traduits
+      types: ['Feu', 'Vol'],
+      typeKeys: ['fire', 'flying'],
+      height: 1.7, // 17 décimètres
+      weight: 90.5, // 905 hectogrammes
+      image: 'https://img.test/art/6.png',
+      stats: [
+        { key: 'hp', label: 'PV', value: 78 },
+        { key: 'special-attack', label: 'Atq. Spé.', value: 109 },
+      ],
+    })
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `${POKEAPI_URL}/pokemon/charizard`,
+      `${POKEAPI_URL}/pokemon-species/6/`,
+    ])
+  })
+
+  it('Pokémon introuvable (404) : renvoie null sans appeler l’espèce', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+
+    await expect(fetchPokemonDetails('missingno')).resolves.toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("espèce indisponible : la fiche s'affiche quand même, en anglais", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(pokemonData))
+      .mockResolvedValueOnce(new Response('', { status: 500 }))
+
+    await expect(fetchPokemonDetails(6)).resolves.toMatchObject({
+      name: 'charizard',
+      genus: null,
+      description: null,
+      types: ['Feu', 'Vol'],
+    })
+  })
+
+  it('erreur serveur sur /pokemon : lève une PokeApiError', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 503 }))
+
+    await expect(fetchPokemonDetails(6)).rejects.toMatchObject({ status: 503 })
   })
 })

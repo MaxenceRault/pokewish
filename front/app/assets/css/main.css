@@ -506,6 +506,15 @@ svg {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+a.card__name {
+  color: inherit;
+  text-decoration: none;
+}
+a.card__name:hover,
+a.card__name:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
 
 .catch {
   justify-self: start;
