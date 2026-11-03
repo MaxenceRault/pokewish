@@ -1,98 +1,97 @@
 name: CI
 
 # Chaque push (toutes branches) lance la CI, visible dans l'onglet Actions.
-# Les checks s'affichent aussi dans la PR de la branche, une seule fois.
+# Les déploiements ne tournent que sur main.
 on:
   push:
 
-# Un job par contrôle et par projet (front = Nuxt, back = API Hono) :
-# chacun apparaît comme une coche séparée, et ils tournent en parallèle.
+# Organisation (de gauche à droite dans l'onglet Actions) :
+#   1. i18n · API · Install · Install        (installs mis en cache)
+#   2. API · contrôles  /  contrôles du front (matrices, en parallèle)
+#      API · Paquet Lambda
+#   3. API · Build + /health  /  Build
+#   4. E2E (Playwright)
+#   5. Deploy (AWS Lambda) -> Deploy (Vercel)       (main uniquement)
+#
+# Les jobs « Install » font npm ci une seule fois et mettent node_modules en
+# cache ; les jobs suivants le restaurent au lieu de tout réinstaller.
+
+env:
+  NODE_VERSION: 24
+
 jobs:
-  # Traductions front + back : chaque langue doit avoir les clés de en.json
-  locales:
-    name: Traductions (clés des locales)
+  # ---------------------------------------------------------------- 1. Départ
+
+  i18n:
+    name: i18n (clés des locales)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
       - run: node scripts/check-locales.mjs
 
-  lint:
-    name: Lint (${{ matrix.project }})
+  api-install:
+    name: API · Install
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [front, back]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-      - run: npm ci
-      - run: npm run lint
+          cache-dependency-path: back/package-lock.json
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: back/node_modules
+          key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: back
 
-  prettier:
-    name: Prettier (${{ matrix.project }})
+  install:
+    name: Install
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [front, back]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-      - run: npm ci
-      - run: npm run format:check
-
-  typecheck:
-    name: Typecheck (${{ matrix.project }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [front, back]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+          cache-dependency-path: front/package-lock.json
+      # .nuxt (généré par nuxt prepare au postinstall) sert au lint et aux types
+      - id: cache
+        uses: actions/cache@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
+          path: |
+            front/node_modules
+            front/.nuxt
+          key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: front
 
-  test:
-    name: Tests Vitest (${{ matrix.project }})
+  # ------------------------------------------------------ 2. Contrôles (API)
+
+  api-checks:
+    name: API · ${{ matrix.check.name }}
+    needs: [i18n, api-install]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        project: [front, back]
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    # PostgreSQL jetable pour les tests du store SQL (back/tests/postgres.test.ts)
+        check:
+          - { name: 'Format (Prettier)', run: 'npm run format:check' }
+          - { name: 'Lint (ESLint)', run: 'npm run lint' }
+          - { name: 'Typecheck', run: 'npm run typecheck' }
+          - { name: 'Tests (Vitest)', run: 'npm test' }
+          - { name: 'Tests BDD (Postgres)', run: 'npm run test:db', db: true }
+    # PostgreSQL jetable, démarré seulement pour « Tests BDD » (image vide = pas de service)
     services:
       postgres:
-        image: postgres:17
+        image: ${{ matrix.check.db && 'postgres:17' || '' }}
         env:
           POSTGRES_PASSWORD: postgres
         ports: ['5432:5432']
@@ -100,67 +99,154 @@ jobs:
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      TEST_DATABASE_URL: ${{ matrix.check.db && 'postgres://postgres:postgres@localhost:5432/postgres' || '' }}
+    defaults:
+      run:
+        working-directory: back
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-      - run: npm ci
-      - run: npm test
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: back/node_modules
+          key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
+          fail-on-cache-miss: true
+      - run: ${{ matrix.check.run }}
 
-  build:
-    name: Build (${{ matrix.project }})
+  # Paquet Lambda (un seul fichier, bundlé par esbuild), réutilisé tel quel
+  # par le déploiement : on déploie exactement ce qui a été construit ici.
+  api-package:
+    name: API · Paquet Lambda
+    needs: [api-install]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: back
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: back/node_modules
+          key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
+          fail-on-cache-miss: true
+      - run: npm run package:lambda
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lambda-zip
+          path: back/lambda.zip
+          retention-days: 7
+
+  # ----------------------------------------------------- 2. Contrôles (front)
+
+  checks:
+    name: ${{ matrix.check.name }}
+    needs: [i18n, install]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        project: [front, back]
+        check:
+          - { name: 'Format (Prettier)', run: 'npm run format:check' }
+          - { name: 'Lint (ESLint)', run: 'npm run lint' }
+          - { name: 'Typecheck', run: 'npm run typecheck' }
+          - { name: 'Tests (Vitest)', run: 'npm test' }
     defaults:
       run:
-        working-directory: ${{ matrix.project }}
+        working-directory: front
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-      - run: npm ci
-      - run: npm run build
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            front/node_modules
+            front/.nuxt
+          key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
+          fail-on-cache-miss: true
+      - run: ${{ matrix.check.run }}
 
-      # Back uniquement : on démarre l'API buildée et on vérifie GET /health
+  # ------------------------------------------------------------------ 3. Builds
+
+  api-build:
+    name: API · Build + /health
+    needs: [api-checks]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: back
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: back/node_modules
+          key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
+          fail-on-cache-miss: true
+      - run: npm run build
+      # On démarre l'API buildée et on vérifie GET /health
       - name: Smoke test GET /health
-        if: matrix.project == 'back'
         run: |
           PORT=3001 npm start &
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             curl -sf http://localhost:3001/health && exit 0
             sleep 0.5
           done
           echo "GET /health n'a pas répondu 200" && exit 1
 
+  build:
+    name: Build
+    needs: [checks]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            front/node_modules
+            front/.nuxt
+          key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
+          fail-on-cache-miss: true
+      - run: npm run build
+
+  # -------------------------------------------------------------------- 4. E2E
+
   # Le front et la vraie API ensemble, dans un navigateur (PokéAPI simulée)
   e2e:
     name: E2E (Playwright)
+    needs: [api-build, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: |
-            front/package-lock.json
-            back/package-lock.json
-      - name: Install back
-        run: npm ci
-        working-directory: back
-      - name: Install front
-        run: npm ci
-        working-directory: front
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: back/node_modules
+          key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            front/node_modules
+            front/.nuxt
+          key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
+          fail-on-cache-miss: true
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
         working-directory: front
@@ -175,14 +261,15 @@ jobs:
           path: front/playwright-report
           retention-days: 7
 
-  # Déploiement continu : sur main uniquement, et seulement si TOUS les
-  # contrôles ci-dessus sont verts. Met à jour le CODE de la Lambda ; sa
+  # ------------------------------------------------- 5. Déploiements (main)
+
+  # Met à jour le CODE de la Lambda avec le paquet construit plus haut ; sa
   # configuration (DATABASE_URL, CORS) reste dans AWS (npm run deploy:lambda).
   # Authentification AWS par OIDC : aucune clé AWS stockée dans GitHub
   # (rôle créé par back/scripts/setup-github-deploy.sh).
-  deploy:
-    name: Déploiement AWS Lambda
-    needs: [locales, lint, prettier, typecheck, test, build, e2e]
+  deploy-lambda:
+    name: Deploy (AWS Lambda)
+    needs: [e2e, api-package]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Deux déploiements ne se chevauchent jamais
@@ -196,19 +283,10 @@ jobs:
       AWS_REGION: eu-north-1
       FUNCTION: pokewish-api
       API_URL: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
-    defaults:
-      run:
-        working-directory: back
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: back/package-lock.json
-      - run: npm ci
-      - name: Paquet Lambda
-        run: npm run package:lambda
+          name: lambda-zip
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::805815160134:role/pokewish-github-deploy
@@ -226,12 +304,12 @@ jobs:
             echo
           done
 
-  # Front Nuxt (SSR) sur Vercel : sur main, après la mise à jour de l'API
-  # (elle-même lancée seulement si tous les contrôles sont verts).
-  # Secrets GitHub nécessaires : VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
-  deploy-front:
-    name: Déploiement Vercel (front SSR)
-    needs: [deploy]
+  # Front Nuxt (SSR) sur Vercel, après la mise à jour de l'API.
+  # Secrets GitHub : VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID ;
+  # variable GitHub : FRONT_URL (vérification SSR après déploiement).
+  deploy-vercel:
+    name: Deploy (Vercel)
+    needs: [deploy-lambda, build]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
@@ -249,10 +327,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: front/package-lock.json
-      - run: npm ci
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            front/node_modules
+            front/.nuxt
+          key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
+          fail-on-cache-miss: true
       # Réglages et variables (NUXT_PUBLIC_API_BASE…) du projet Vercel
       - run: npx vercel@65 pull --yes --environment=production --token="$VERCEL_TOKEN"
       - run: npx vercel@65 build --prod --token="$VERCEL_TOKEN"
