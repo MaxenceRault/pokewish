@@ -48,7 +48,6 @@
     "pokeApiDown": "PokéAPI no está disponible en este momento.",
     "notFoundTitle": "Pokémon no encontrado",
     "notFoundText": "Ningún Pokémon coincide con «{name}».",
-    "notFoundHint": "Prueba un nombre en inglés (pikachu) o un número (25).",
     "backHome": "Volver a la Pokédex",
     "types": "Tipos",
     "height": "Altura",
