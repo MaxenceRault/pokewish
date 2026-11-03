@@ -27,6 +27,40 @@ export default defineNuxtConfig({
       { code: 'de', language: 'de-DE', name: 'Deutsch', file: 'de.json' },
     ],
   },
+  // Site statique (npm run generate) : une page HTML par Pokémon.
+  // Les noms viennent de PokéAPI au moment du build ; seule la langue par
+  // défaut est pré-générée (/pokemon/pikachu), les autres langues et les
+  // liens par numéro (/pokemon/25) sont rendus dans le navigateur (200.html).
+  hooks: {
+    async 'nitro:config'(nitroConfig) {
+      if (!nitroConfig.static) return // seulement pour `nuxt generate`
+      const limit = Number(process.env.PRERENDER_POKEMON_LIMIT ?? 1025)
+      const res = await fetch(
+        `https://pokeapi.co/api/v2/pokemon?limit=${limit}`,
+      )
+      if (!res.ok) throw new Error(`PokéAPI a répondu ${res.status}`)
+      const { results } = (await res.json()) as {
+        results: { name: string }[]
+      }
+      const routes = results.map((p) => `/pokemon/${p.name}`)
+      nitroConfig.prerender ??= {}
+      nitroConfig.prerender.routes = [
+        ...(nitroConfig.prerender.routes ?? []),
+        // Accueil dans chaque langue + une fiche par Pokémon (langue par défaut)
+        '/',
+        '/fr',
+        '/es',
+        '/de',
+        ...routes,
+      ]
+      // Ne pas suivre les liens (sélecteur de langue) : sinon 4 × 1025 pages
+      // et ~8000 appels à PokéAPI à chaque build
+      nitroConfig.prerender.crawlLinks = false
+      // PokéAPI peut répondre lentement : on réessaie avant d'échouer
+      nitroConfig.prerender.retry = 3
+      nitroConfig.prerender.retryDelay = 1000
+    },
+  },
   // Inclut les tests (Vitest et Playwright) dans `nuxt typecheck`
   typescript: {
     tsConfig: {
