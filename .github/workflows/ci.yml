@@ -281,9 +281,8 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       FRONT_URL: ${{ vars.FRONT_URL }}
-    defaults:
-      run:
-        working-directory: front
+    # Le projet Vercel a « front » comme Root Directory : la CLI se lance
+    # donc depuis la racine du dépôt (sinon elle chercherait front/front).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
