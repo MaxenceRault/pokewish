@@ -32,6 +32,16 @@ npm run db:migrate      # crée la table (rejouable sans risque)
 npm run dev             # « Wishlist : PostgreSQL (DATABASE_URL) »
 ```
 
+Tests des routes sur une **vraie base**, sans mock SQL (`back/tests/db/`) :
+CRUD, doublons, limite de 6, persistance. Chaque fichier travaille dans un
+schéma jetable `pokewish_test_*`, vidé entre chaque test puis supprimé.
+
+```bash
+cd back && npm run test:db   # utilise TEST_DATABASE_URL de back/.env
+```
+
+Dans la CI, ils tournent contre un PostgreSQL 17 jetable (service GitHub Actions).
+
 | Route                  | Corps                  | Réponses                                    |
 | ---------------------- | ---------------------- | ------------------------------------------- |
 | `GET /health`          |                        | 200                                         |
