@@ -6,9 +6,10 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
     public: {
-      // Adresse de l'API Hono (back/). Surchargeable sans rebuild :
+      // Adresse de l'API Hono (back/). Celle présente au build est intégrée
+      // (CI : API AWS) ; surchargeable ensuite par la même variable :
       // NUXT_PUBLIC_API_BASE=http://localhost:4000 npm run dev
-      apiBase: 'http://localhost:3001',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'http://localhost:3001',
       // PokéAPI REST, appelée aussi côté serveur (SSR des fiches).
       // Remplacée par un faux PokéAPI dans les tests e2e : NUXT_PUBLIC_POKEAPI_URL
       pokeapiUrl: 'https://pokeapi.co/api/v2',
