@@ -1,10 +1,5 @@
-import type { Pokemon, WishlistItem } from '~/types/pokemon'
-import {
-  DEX_CACHE_KEY,
-  parsePokemonList,
-  parseWishlist,
-  STORAGE_KEY,
-} from './wishlist'
+import type { Pokemon } from '~/types/pokemon'
+import { DEX_CACHE_KEY, parsePokemonList } from './wishlist'
 
 // Le stockage peut être absent (rendu serveur) ou lever une erreur
 // (navigation privée, stockage bloqué, quota plein) : on ne plante jamais.
@@ -30,14 +25,6 @@ export function writeStorage(
   } catch {
     return false
   }
-}
-
-export function loadWishlist(storage?: Storage): WishlistItem[] {
-  return parseWishlist(readStorage(STORAGE_KEY, storage))
-}
-
-export function saveWishlist(list: WishlistItem[], storage?: Storage): boolean {
-  return writeStorage(STORAGE_KEY, JSON.stringify(list), storage)
 }
 
 export function loadDexCache(storage?: Storage): Pokemon[] {

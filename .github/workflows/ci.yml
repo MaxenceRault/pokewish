@@ -118,3 +118,36 @@ jobs:
             sleep 0.5
           done
           echo "GET /health n'a pas répondu 200" && exit 1
+
+  # Le front et la vraie API ensemble, dans un navigateur (PokéAPI simulée)
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            front/package-lock.json
+            back/package-lock.json
+      - name: Install back
+        run: npm ci
+        working-directory: back
+      - name: Install front
+        run: npm ci
+        working-directory: front
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: front
+      - name: Playwright
+        run: npm run test:e2e
+        working-directory: front
+      # En cas d'échec : rapport HTML, captures et traces téléchargeables
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: front/playwright-report
+          retention-days: 7

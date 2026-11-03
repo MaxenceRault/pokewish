@@ -391,6 +391,16 @@ svg {
   color: var(--red-lo);
 }
 
+.retry {
+  margin-left: 8px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--red-lo);
+  color: #fff;
+  cursor: pointer;
+}
+
 /* ---------- Wishlist ---------- */
 .progress {
   height: 8px;
