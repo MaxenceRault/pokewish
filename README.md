@@ -77,6 +77,30 @@ IAM, la Lambda et l'API Gateway, puis vérifie `/health` et `/wishlist`. Il lit
 Front branché sur l'API AWS :
 `NUXT_PUBLIC_API_BASE=https://<id>.execute-api.eu-north-1.amazonaws.com npm run dev`
 
+## Front en ligne
+
+| Hébergement                       | Adresse                               | Rendu              |
+| --------------------------------- | ------------------------------------- | ------------------ |
+| Vercel                            | https://pokewish.vercel.app           | SSR (serveur Nuxt) |
+| S3 + CloudFront (CDN, eu-north-1) | https://d1nxawsm2mnxx8.cloudfront.net | statique (SSG)     |
+
+Les deux appellent la même API AWS. Ils sont déployés par la CI sur `main`,
+une fois tous les contrôles verts (jobs « Deploy (Vercel) » et
+« Deploy (S3 + CloudFront) »).
+
+**Site statique** : `npm run generate` récupère les 1025 noms de Pokémon sur
+PokéAPI et génère une page HTML par fiche (`/pokemon/pikachu`), plus
+l'accueil dans chaque langue. Les autres langues et les liens par numéro
+sont rendus dans le navigateur (repli sur `200.html`).
+
+```bash
+cd front
+bash scripts/setup-static-site.sh          # une fois : bucket S3 + CloudFront
+bash scripts/setup-github-static-deploy.sh # une fois : droits OIDC de la CI
+NUXT_PUBLIC_API_BASE=https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com npm run generate
+bash scripts/publish-static.sh             # envoi S3 + invalidation CloudFront
+```
+
 ## Tests e2e (Playwright)
 
 ```bash

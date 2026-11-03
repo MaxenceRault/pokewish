@@ -277,9 +277,10 @@ jobs:
       group: deploy-vercel
       cancel-in-progress: false
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      # Lus en secret ou, à défaut, en variable de l'environnement « prod »
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || vars.VERCEL_TOKEN }}
       FRONT_URL: ${{ vars.FRONT_URL }}
     # Le projet Vercel a « front » comme Root Directory : la CLI se lance
     # donc depuis la racine du dépôt (sinon elle chercherait front/front).
@@ -306,3 +307,54 @@ jobs:
           html=$(curl -sf --retry 3 --retry-all-errors "$FRONT_URL/pokemon/25")
           echo "$html" | grep -o '<title>[^<]*</title>'
           echo "$html" | grep -q 'Pikachu' || { echo "Fiche absente du HTML"; exit 1; }
+
+  # Site statique (SSG) sur S3 + CloudFront, une fois E2E et builds verts :
+  # generate (une page HTML par Pokémon), envoi S3, vidage du cache CDN.
+  # Authentification AWS par OIDC, sans clé : rôle pokewish-github-deploy
+  # (front/scripts/setup-github-static-deploy.sh). Pas d'environnement GitHub
+  # ici : il changerait l'identité OIDC envoyée à AWS.
+  deploy-static:
+    name: Deploy (S3 + CloudFront)
+    needs: [e2e, build, api-package]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-static
+      cancel-in-progress: false
+    permissions:
+      id-token: write # jeton OIDC pour AWS
+      contents: read
+    env:
+      NUXT_PUBLIC_API_BASE: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
+      S3_BUCKET: pokewish-static-805815160134
+      CLOUDFRONT_DISTRIBUTION_ID: E1G23D8DCWMLIO
+      SITE_URL: https://d1nxawsm2mnxx8.cloudfront.net
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            front/node_modules
+            front/.nuxt
+          key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
+          fail-on-cache-miss: true
+      - name: Generate (une page HTML par Pokémon)
+        run: npm run generate
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::805815160134:role/pokewish-github-deploy
+          aws-region: eu-north-1
+      - name: Envoi S3 + invalidation CloudFront
+        run: bash scripts/publish-static.sh
+      - name: Vérification (/pokemon/pikachu en HTML statique)
+        run: |
+          sleep 20
+          html=$(curl -sf --retry 5 --retry-all-errors "$SITE_URL/pokemon/pikachu")
+          echo "$html" | grep -o '<title>[^<]*</title>'
+          echo "$html" | grep -q "$NUXT_PUBLIC_API_BASE" || { echo "API AWS absente"; exit 1; }
