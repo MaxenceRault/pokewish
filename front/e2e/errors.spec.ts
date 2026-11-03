@@ -11,7 +11,7 @@ test.describe('Erreurs', () => {
     await page.route(`${API_URL}/**`, (route) =>
       route.abort('connectionrefused'),
     )
-    await page.goto('/')
+    await page.goto('/fr')
 
     const alert = page.getByRole('alert')
     await expect(alert).toContainText("L'API PokéWish est injoignable")

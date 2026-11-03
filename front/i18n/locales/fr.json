@@ -1,0 +1,87 @@
+{
+  "lang": {
+    "label": "Langue"
+  },
+  "search": {
+    "label": "Recherche",
+    "status": {
+      "pending": "Synchro…",
+      "error": "Hors ligne",
+      "success": "En ligne"
+    },
+    "placeholder": "Nom ou numéro…",
+    "ariaLabel": "Rechercher un Pokémon par nom ou numéro",
+    "results": "Résultats de recherche",
+    "pokeApiDown": "PokéAPI est injoignable pour le moment.",
+    "loading": "Chargement du Pokédex",
+    "hint": "Essaie « pika », « salamèche » ou « 25 ».",
+    "noResult": "Aucun Pokémon trouvé.",
+    "added": "Ajouté ✓",
+    "listFull": "Liste pleine"
+  },
+  "wishlist": {
+    "title": "Ma wishlist",
+    "caughtCount": "{caught} / {total} capturés",
+    "progress": "Progression des captures",
+    "full": "Wishlist pleine ({max}/{max}) : retire un Pokémon pour en ajouter un autre.",
+    "connecting": "Connexion à l'API",
+    "loadError": "Impossible de charger la wishlist depuis l'API.",
+    "empty": "Ta wishlist est vide.",
+    "emptyHint": "Cherche un Pokémon au-dessus pour l'ajouter.",
+    "caught": "Capturé",
+    "toCatch": "À capturer",
+    "viewSheet": "Voir la fiche de {name}",
+    "remove": "Retirer {name}"
+  },
+  "errors": {
+    "network": "L'API PokéWish est injoignable. Lance `npm run dev` dans back/.",
+    "http": "L'API a répondu {status}.",
+    "unexpected": "Erreur inattendue de l'API.",
+    "retry": "Réessayer"
+  },
+  "pokemon": {
+    "back": "← Pokédex",
+    "sheet": "Fiche",
+    "data": "Données",
+    "total": "Total {total}",
+    "loading": "Analyse en cours",
+    "pokeApiDown": "PokéAPI est injoignable pour le moment.",
+    "notFoundTitle": "Pokémon introuvable",
+    "notFoundText": "Aucun Pokémon ne correspond à « {name} ».",
+    "notFoundHint": "Essaie un nom anglais (pikachu) ou un numéro (25).",
+    "backHome": "Retour au Pokédex",
+    "types": "Types",
+    "height": "Taille",
+    "weight": "Poids",
+    "stats": "Statistiques de base",
+    "noData": "Aucune donnée à afficher."
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Feu",
+    "water": "Eau",
+    "grass": "Plante",
+    "electric": "Électrik",
+    "ice": "Glace",
+    "fighting": "Combat",
+    "poison": "Poison",
+    "ground": "Sol",
+    "flying": "Vol",
+    "psychic": "Psy",
+    "bug": "Insecte",
+    "rock": "Roche",
+    "ghost": "Spectre",
+    "dragon": "Dragon",
+    "dark": "Ténèbres",
+    "steel": "Acier",
+    "fairy": "Fée"
+  },
+  "stats": {
+    "hp": "PV",
+    "attack": "Attaque",
+    "defense": "Défense",
+    "special-attack": "Atq. Spé.",
+    "special-defense": "Déf. Spé.",
+    "speed": "Vitesse"
+  }
+}

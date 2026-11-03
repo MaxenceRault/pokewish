@@ -38,35 +38,42 @@ export function setCaught(
   return list.map((p) => (p.id === id ? { ...p, caught } : p))
 }
 
-/** La wishlist, gardée dans un simple tableau en mémoire (perdue au redémarrage). */
+/**
+ * Où la wishlist est gardée. Deux implémentations, même comportement :
+ * - createWishlistStore : tableau en mémoire (tests, ou sans base)
+ * - createPostgresStore (db.ts) : table PostgreSQL `wishlist`
+ */
 export interface WishlistStore {
-  all(): WishlistItem[]
-  add(pokemon: Pokemon): { item: WishlistItem } | { error: AddError }
+  all(): Promise<WishlistItem[]>
+  add(pokemon: Pokemon): Promise<{ item: WishlistItem } | { error: AddError }>
   /** `false` si le Pokémon n'était pas dans la liste */
-  remove(id: number): boolean
+  remove(id: number): Promise<boolean>
   /** `null` si le Pokémon n'est pas dans la liste */
-  setCaught(id: number, caught: boolean): WishlistItem | null
+  setCaught(id: number, caught: boolean): Promise<WishlistItem | null>
 }
 
+/** Tableau en mémoire : perdu au redémarrage de l'API. */
 export function createWishlistStore(
   initial: WishlistItem[] = [],
 ): WishlistStore {
   let items = [...initial]
 
   return {
-    all: () => items,
-    add(pokemon) {
+    async all() {
+      return items
+    },
+    async add(pokemon) {
       const error = checkAdd(items, pokemon.id)
       if (error) return { error }
       items = addPokemon(items, pokemon)
       return { item: items.at(-1)! }
     },
-    remove(id) {
+    async remove(id) {
       const before = items.length
       items = removePokemon(items, id)
       return items.length < before
     },
-    setCaught(id, caught) {
+    async setCaught(id, caught) {
       if (!items.some((p) => p.id === id)) return null
       items = setCaught(items, id, caught)
       return items.find((p) => p.id === id)!

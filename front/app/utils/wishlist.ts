@@ -1,7 +1,9 @@
 import type { Pokemon, WishlistItem } from '~/types/pokemon'
 
-/** Cache de la liste des noms français (elle ne change quasiment jamais). */
-export const DEX_CACHE_KEY = 'pokewish:dex-fr:v1'
+/** Cache des noms du Pokédex dans une langue (ils ne changent quasiment jamais). */
+export function dexCacheKey(lang: string): string {
+  return `pokewish:dex-${lang}:v1`
+}
 
 /**
  * Comme une équipe : 6 Pokémon maximum. C'est l'API qui fait respecter la

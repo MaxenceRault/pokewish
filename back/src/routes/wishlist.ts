@@ -1,12 +1,10 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { validator } from 'hono/validator'
+import { t } from '../i18n.js'
 import type { ApiError } from '../types.js'
 import type { WishlistStore } from '../wishlist.js'
 
-const ADD_ERRORS = {
-  DUPLICATE: 'Ce Pokémon est déjà dans la wishlist.',
-  WISHLIST_FULL: 'La wishlist est pleine (6 Pokémon maximum).',
-} as const
+// Messages d'erreur dans la langue de la requête (Accept-Language), voir i18n.ts
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null
@@ -16,7 +14,7 @@ const idParam = validator('param', (value: Record<string, string>, c) => {
   const id = Number(value.id)
   if (!Number.isInteger(id) || id <= 0) {
     return c.json<ApiError>(
-      { error: 'INVALID_ID', message: "L'id doit être un entier positif." },
+      { error: 'INVALID_ID', message: t(c, 'INVALID_ID') },
       400,
     )
   }
@@ -33,10 +31,7 @@ const pokemonBody = validator('json', (value: unknown, c) => {
     !value.name.trim()
   ) {
     return c.json<ApiError>(
-      {
-        error: 'INVALID_BODY',
-        message: 'Attendu : { "id": entier positif, "name": texte }.',
-      },
+      { error: 'INVALID_BODY', message: t(c, 'INVALID_POKEMON_BODY') },
       400,
     )
   }
@@ -47,30 +42,30 @@ const pokemonBody = validator('json', (value: unknown, c) => {
 const caughtBody = validator('json', (value: unknown, c) => {
   if (!isObject(value) || typeof value.caught !== 'boolean') {
     return c.json<ApiError>(
-      { error: 'INVALID_BODY', message: 'Attendu : { "caught": booléen }.' },
+      { error: 'INVALID_BODY', message: t(c, 'INVALID_CAUGHT_BODY') },
       400,
     )
   }
   return { caught: value.caught }
 })
 
-const notFound = (id: number): ApiError => ({
+const notFound = (c: Context, id: number): ApiError => ({
   error: 'NOT_FOUND',
-  message: `Le Pokémon n°${id} n'est pas dans la wishlist.`,
+  message: t(c, 'NOT_FOUND', { id }),
 })
 
 export function wishlistRoutes(store: WishlistStore) {
   return (
     new Hono()
       // Toute la wishlist
-      .get('/', (c) => c.json(store.all(), 200))
+      .get('/', async (c) => c.json(await store.all(), 200))
 
       // Ajoute un Pokémon : 201, ou 409 si doublon / liste pleine
-      .post('/', pokemonBody, (c) => {
-        const result = store.add(c.req.valid('json'))
+      .post('/', pokemonBody, async (c) => {
+        const result = await store.add(c.req.valid('json'))
         if ('error' in result) {
           return c.json<ApiError>(
-            { error: result.error, message: ADD_ERRORS[result.error] },
+            { error: result.error, message: t(c, result.error) },
             409,
           )
         }
@@ -78,17 +73,18 @@ export function wishlistRoutes(store: WishlistStore) {
       })
 
       // Marque capturé / à capturer
-      .patch('/:id', idParam, caughtBody, (c) => {
+      .patch('/:id', idParam, caughtBody, async (c) => {
         const { id } = c.req.valid('param')
-        const item = store.setCaught(id, c.req.valid('json').caught)
-        if (!item) return c.json<ApiError>(notFound(id), 404)
+        const item = await store.setCaught(id, c.req.valid('json').caught)
+        if (!item) return c.json<ApiError>(notFound(c, id), 404)
         return c.json(item, 200)
       })
 
       // Retire un Pokémon : 204, ou 404 s'il n'y était pas
-      .delete('/:id', idParam, (c) => {
+      .delete('/:id', idParam, async (c) => {
         const { id } = c.req.valid('param')
-        if (!store.remove(id)) return c.json<ApiError>(notFound(id), 404)
+        if (!(await store.remove(id)))
+          return c.json<ApiError>(notFound(c, id), 404)
         return c.body(null, 204)
       })
   )

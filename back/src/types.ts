@@ -11,7 +11,7 @@ export interface WishlistItem extends Pokemon {
 
 /** Corps de toutes les réponses d'erreur de l'API. */
 export interface ApiError {
-  error: 'INVALID_BODY' | 'INVALID_ID' | 'NOT_FOUND' | AddError
+  error: 'INVALID_BODY' | 'INVALID_ID' | 'NOT_FOUND' | 'INTERNAL' | AddError
   message: string
 }
 

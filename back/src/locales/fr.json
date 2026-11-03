@@ -1,0 +1,9 @@
+{
+  "INVALID_ID": "L'id doit être un entier positif.",
+  "INVALID_POKEMON_BODY": "Attendu : { \"id\": entier positif, \"name\": texte }.",
+  "INVALID_CAUGHT_BODY": "Attendu : { \"caught\": booléen }.",
+  "DUPLICATE": "Ce Pokémon est déjà dans la wishlist.",
+  "WISHLIST_FULL": "La wishlist est pleine (6 Pokémon maximum).",
+  "NOT_FOUND": "Le Pokémon n°{id} n'est pas dans la wishlist.",
+  "INTERNAL": "Erreur interne de l'API."
+}

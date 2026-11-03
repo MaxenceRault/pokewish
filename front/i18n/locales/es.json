@@ -1,0 +1,87 @@
+{
+  "lang": {
+    "label": "Idioma"
+  },
+  "search": {
+    "label": "Búsqueda",
+    "status": {
+      "pending": "Sincronizando…",
+      "error": "Sin conexión",
+      "success": "En línea"
+    },
+    "placeholder": "Nombre o número…",
+    "ariaLabel": "Buscar un Pokémon por nombre o número",
+    "results": "Resultados de búsqueda",
+    "pokeApiDown": "PokéAPI no está disponible en este momento.",
+    "loading": "Cargando la Pokédex",
+    "hint": "Prueba «pika», «charmander» o «25».",
+    "noResult": "No se encontró ningún Pokémon.",
+    "added": "Añadido ✓",
+    "listFull": "Lista llena"
+  },
+  "wishlist": {
+    "title": "Mi lista de deseos",
+    "caughtCount": "{caught} / {total} capturados",
+    "progress": "Progreso de capturas",
+    "full": "Lista llena ({max}/{max}): quita un Pokémon para añadir otro.",
+    "connecting": "Conectando con la API",
+    "loadError": "No se pudo cargar la lista desde la API.",
+    "empty": "Tu lista de deseos está vacía.",
+    "emptyHint": "Busca un Pokémon arriba para añadirlo.",
+    "caught": "Capturado",
+    "toCatch": "Por capturar",
+    "viewSheet": "Ver la ficha de {name}",
+    "remove": "Quitar a {name}"
+  },
+  "errors": {
+    "network": "La API de PokéWish no responde. Ejecuta `npm run dev` en back/.",
+    "http": "La API respondió {status}.",
+    "unexpected": "Error inesperado de la API.",
+    "retry": "Reintentar"
+  },
+  "pokemon": {
+    "back": "← Pokédex",
+    "sheet": "Ficha",
+    "data": "Datos",
+    "total": "Total {total}",
+    "loading": "Analizando",
+    "pokeApiDown": "PokéAPI no está disponible en este momento.",
+    "notFoundTitle": "Pokémon no encontrado",
+    "notFoundText": "Ningún Pokémon coincide con «{name}».",
+    "notFoundHint": "Prueba un nombre en inglés (pikachu) o un número (25).",
+    "backHome": "Volver a la Pokédex",
+    "types": "Tipos",
+    "height": "Altura",
+    "weight": "Peso",
+    "stats": "Estadísticas base",
+    "noData": "No hay datos que mostrar."
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Fuego",
+    "water": "Agua",
+    "grass": "Planta",
+    "electric": "Eléctrico",
+    "ice": "Hielo",
+    "fighting": "Lucha",
+    "poison": "Veneno",
+    "ground": "Tierra",
+    "flying": "Volador",
+    "psychic": "Psíquico",
+    "bug": "Bicho",
+    "rock": "Roca",
+    "ghost": "Fantasma",
+    "dragon": "Dragón",
+    "dark": "Siniestro",
+    "steel": "Acero",
+    "fairy": "Hada"
+  },
+  "stats": {
+    "hp": "PS",
+    "attack": "Ataque",
+    "defense": "Defensa",
+    "special-attack": "At. Esp.",
+    "special-defense": "Def. Esp.",
+    "speed": "Velocidad"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "lang": {
+    "label": "Language"
+  },
+  "search": {
+    "label": "Search",
+    "status": {
+      "pending": "Syncing…",
+      "error": "Offline",
+      "success": "Online"
+    },
+    "placeholder": "Name or number…",
+    "ariaLabel": "Search a Pokémon by name or number",
+    "results": "Search results",
+    "pokeApiDown": "PokéAPI is unreachable right now.",
+    "loading": "Loading the Pokédex",
+    "hint": "Try “pika”, “charmander” or “25”.",
+    "noResult": "No Pokémon found.",
+    "added": "Added ✓",
+    "listFull": "List full"
+  },
+  "wishlist": {
+    "title": "My wishlist",
+    "caughtCount": "{caught} / {total} caught",
+    "progress": "Capture progress",
+    "full": "Wishlist full ({max}/{max}): remove a Pokémon to add another one.",
+    "connecting": "Connecting to the API",
+    "loadError": "Could not load the wishlist from the API.",
+    "empty": "Your wishlist is empty.",
+    "emptyHint": "Search for a Pokémon above to add it.",
+    "caught": "Caught",
+    "toCatch": "To catch",
+    "viewSheet": "See {name}'s sheet",
+    "remove": "Remove {name}"
+  },
+  "errors": {
+    "network": "The PokéWish API is unreachable. Run `npm run dev` in back/.",
+    "http": "The API responded {status}.",
+    "unexpected": "Unexpected API error.",
+    "retry": "Retry"
+  },
+  "pokemon": {
+    "back": "← Pokédex",
+    "sheet": "Sheet",
+    "data": "Data",
+    "total": "Total {total}",
+    "loading": "Scanning",
+    "pokeApiDown": "PokéAPI is unreachable right now.",
+    "notFoundTitle": "Pokémon not found",
+    "notFoundText": "No Pokémon matches “{name}”.",
+    "notFoundHint": "Try an English name (pikachu) or a number (25).",
+    "backHome": "Back to the Pokédex",
+    "types": "Types",
+    "height": "Height",
+    "weight": "Weight",
+    "stats": "Base stats",
+    "noData": "No data to show."
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Fire",
+    "water": "Water",
+    "grass": "Grass",
+    "electric": "Electric",
+    "ice": "Ice",
+    "fighting": "Fighting",
+    "poison": "Poison",
+    "ground": "Ground",
+    "flying": "Flying",
+    "psychic": "Psychic",
+    "bug": "Bug",
+    "rock": "Rock",
+    "ghost": "Ghost",
+    "dragon": "Dragon",
+    "dark": "Dark",
+    "steel": "Steel",
+    "fairy": "Fairy"
+  },
+  "stats": {
+    "hp": "HP",
+    "attack": "Attack",
+    "defense": "Defense",
+    "special-attack": "Sp. Atk",
+    "special-defense": "Sp. Def",
+    "speed": "Speed"
+  }
+}

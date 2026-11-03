@@ -21,8 +21,26 @@ Pour pointer le front vers une autre API (tests e2e, autre port) :
 
 ## API
 
-La wishlist est gardée dans un tableau en mémoire : elle repart à vide à
-chaque redémarrage de l'API.
+La wishlist est stockée dans **PostgreSQL (Supabase)**, table `wishlist`
+([back/db/init.sql](back/db/init.sql)). Sans `DATABASE_URL`, l'API retombe
+sur un tableau en mémoire (perdu au redémarrage) : c'est le cas dans la CI.
+
+```bash
+cd back
+cp .env.example .env    # puis remplir DATABASE_URL (Supabase > Connect > Session pooler)
+npm run db:migrate      # crée la table (rejouable sans risque)
+npm run dev             # « Wishlist : PostgreSQL (DATABASE_URL) »
+```
+
+Tests des routes sur une **vraie base**, sans mock SQL (`back/tests/db/`) :
+CRUD, doublons, limite de 6, persistance. Chaque fichier travaille dans un
+schéma jetable `pokewish_test_*`, vidé entre chaque test puis supprimé.
+
+```bash
+cd back && npm run test:db   # utilise TEST_DATABASE_URL de back/.env
+```
+
+Dans la CI, ils tournent contre un PostgreSQL 17 jetable (service GitHub Actions).
 
 | Route                  | Corps                  | Réponses                                    |
 | ---------------------- | ---------------------- | ------------------------------------------- |
@@ -33,6 +51,41 @@ chaque redémarrage de l'API.
 | `DELETE /wishlist/:id` |                        | 204, 400, 404                               |
 
 Les erreurs ont toutes la forme `{ "error": "CODE", "message": "…" }`.
+
+## Déploiement de l'API (AWS Lambda)
+
+L'API tourne sur **AWS Lambda** derrière **API Gateway** (HTTP API), région
+`eu-north-1` comme la base Supabase. Même app Hono que le serveur Node : seul
+le point d'entrée change ([back/src/lambda.ts](back/src/lambda.ts)).
+
+**Déploiement continu** : à chaque push sur `main`, une fois tous les contrôles
+verts, le job CI « Déploiement AWS Lambda » met à jour le code de la Lambda
+puis vérifie `/health` et `/wishlist`. GitHub s'authentifie auprès d'AWS par
+**OIDC** : aucune clé AWS n'est stockée dans GitHub. Le rôle utilisé ne peut
+que mettre à jour le code de cette Lambda
+([back/aws/github-deploy-policy.json](back/aws/github-deploy-policy.json)), et
+seulement depuis `main` ([back/aws/github-deploy-trust.json](back/aws/github-deploy-trust.json)).
+
+À faire une seule fois, à la main :
+
+```bash
+cd back
+npm run deploy:lambda                  # crée la Lambda et l'API Gateway
+bash scripts/setup-github-deploy.sh    # autorise GitHub Actions (OIDC + rôle)
+```
+
+`npm run deploy:lambda` reste utile pour changer la configuration de la
+Lambda. Il est rejouable : il construit le paquet, crée ou met à jour le rôle
+IAM, la Lambda et l'API Gateway, puis vérifie `/health` et `/wishlist`. Il lit
+`back/.env` et passe à la Lambda :
+
+- `DATABASE_URL` : pooler Supabase « Transaction » (port 6543), déduit de
+  `DATABASE_URL` ou fourni via `LAMBDA_DATABASE_URL` ;
+- `CORS_ORIGINS` : origines du front autorisées (`LAMBDA_CORS_ORIGINS`,
+  défaut `http://localhost:3000`).
+
+Front branché sur l'API AWS :
+`NUXT_PUBLIC_API_BASE=https://<id>.execute-api.eu-north-1.amazonaws.com npm run dev`
 
 ## Tests e2e (Playwright)
 
@@ -56,6 +109,13 @@ npm test              # Vitest
 npm run build         # Build
 ```
 
+À la racine, les traductions du front et du back (chaque langue comparée à
+`en.json` : clés manquantes ou en trop, textes vides, paramètres `{…}`) :
+
+```bash
+node scripts/check-locales.mjs
+```
+
 La CI (`.github/workflows/ci.yml`) lance ces 5 contrôles pour chaque projet à
-chaque push. Pour le back, elle démarre aussi l'API et vérifie que
-`GET /health` répond 200.
+chaque push, plus la vérification des traductions. Pour le back, elle démarre
+aussi l'API et vérifie que `GET /health` répond 200.

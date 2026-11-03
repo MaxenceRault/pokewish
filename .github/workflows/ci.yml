@@ -8,6 +8,17 @@ on:
 # Un job par contrôle et par projet (front = Nuxt, back = API Hono) :
 # chacun apparaît comme une coche séparée, et ils tournent en parallèle.
 jobs:
+  # Traductions front + back : chaque langue doit avoir les clés de en.json
+  locales:
+    name: Traductions (clés des locales)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/check-locales.mjs
+
   lint:
     name: Lint (${{ matrix.project }})
     runs-on: ubuntu-latest
@@ -78,6 +89,18 @@ jobs:
     defaults:
       run:
         working-directory: ${{ matrix.project }}
+    # PostgreSQL jetable pour les tests du store SQL (back/tests/postgres.test.ts)
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -151,3 +174,93 @@ jobs:
           name: playwright-report
           path: front/playwright-report
           retention-days: 7
+
+  # Déploiement continu : sur main uniquement, et seulement si TOUS les
+  # contrôles ci-dessus sont verts. Met à jour le CODE de la Lambda ; sa
+  # configuration (DATABASE_URL, CORS) reste dans AWS (npm run deploy:lambda).
+  # Authentification AWS par OIDC : aucune clé AWS stockée dans GitHub
+  # (rôle créé par back/scripts/setup-github-deploy.sh).
+  deploy:
+    name: Déploiement AWS Lambda
+    needs: [locales, lint, prettier, typecheck, test, build, e2e]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Deux déploiements ne se chevauchent jamais
+    concurrency:
+      group: deploy-lambda
+      cancel-in-progress: false
+    permissions:
+      id-token: write # jeton OIDC pour AWS
+      contents: read
+    env:
+      AWS_REGION: eu-north-1
+      FUNCTION: pokewish-api
+      API_URL: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
+    defaults:
+      run:
+        working-directory: back
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: back/package-lock.json
+      - run: npm ci
+      - name: Paquet Lambda
+        run: npm run package:lambda
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::805815160134:role/pokewish-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Mise à jour du code de la Lambda
+        run: |
+          aws lambda update-function-code --function-name "$FUNCTION" \
+            --zip-file fileb://lambda.zip --query LastModified --output text
+          aws lambda wait function-updated --function-name "$FUNCTION"
+      - name: Vérification via AWS (/health et /wishlist)
+        run: |
+          for route in /health /wishlist; do
+            echo "GET $route"
+            curl -sf --retry 3 --retry-all-errors "$API_URL$route"
+            echo
+          done
+
+  # Front Nuxt (SSR) sur Vercel : sur main, après la mise à jour de l'API
+  # (elle-même lancée seulement si tous les contrôles sont verts).
+  # Secrets GitHub nécessaires : VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+  deploy-front:
+    name: Déploiement Vercel (front SSR)
+    needs: [deploy]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-vercel
+      cancel-in-progress: false
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      FRONT_URL: ${{ vars.FRONT_URL }}
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci
+      # Réglages et variables (NUXT_PUBLIC_API_BASE…) du projet Vercel
+      - run: npx vercel@65 pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - run: npx vercel@65 build --prod --token="$VERCEL_TOKEN"
+      - run: npx vercel@65 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      # Le HTML d'une fiche doit sortir du serveur déjà rempli (SSR)
+      - name: Vérification SSR (/pokemon/25)
+        if: env.FRONT_URL != ''
+        run: |
+          html=$(curl -sf --retry 3 --retry-all-errors "$FRONT_URL/pokemon/25")
+          echo "$html" | grep -o '<title>[^<]*</title>'
+          echo "$html" | grep -q 'Pikachu' || { echo "Fiche absente du HTML"; exit 1; }

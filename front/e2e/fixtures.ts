@@ -2,18 +2,27 @@ import { test as base, expect, type Locator, type Page } from '@playwright/test'
 import type { Pokemon, WishlistItem } from '../app/types/pokemon'
 import { API_URL } from './env'
 
-/** Petit Pokédex de test, renvoyé à la place de PokéAPI. */
-export const DEX: Pokemon[] = [
-  { id: 1, name: 'Bulbizarre' },
-  { id: 4, name: 'Salamèche' },
-  { id: 7, name: 'Carapuce' },
-  { id: 25, name: 'Pikachu' },
-  { id: 26, name: 'Raichu' },
-  { id: 94, name: 'Ectoplasma' },
-  { id: 133, name: 'Évoli' },
-  { id: 150, name: 'Mewtwo' },
-  { id: 849, name: 'Salarsen' },
-]
+/** Petit Pokédex de test, dans chaque langue, renvoyé à la place de PokéAPI. */
+const NAMES: Record<number, Record<'en' | 'fr' | 'es' | 'de', string>> = {
+  1: { en: 'Bulbasaur', fr: 'Bulbizarre', es: 'Bulbasaur', de: 'Bisasam' },
+  4: { en: 'Charmander', fr: 'Salamèche', es: 'Charmander', de: 'Glumanda' },
+  7: { en: 'Squirtle', fr: 'Carapuce', es: 'Squirtle', de: 'Schiggy' },
+  25: { en: 'Pikachu', fr: 'Pikachu', es: 'Pikachu', de: 'Pikachu' },
+  26: { en: 'Raichu', fr: 'Raichu', es: 'Raichu', de: 'Raichu' },
+  94: { en: 'Gengar', fr: 'Ectoplasma', es: 'Gengar', de: 'Gengar' },
+  133: { en: 'Eevee', fr: 'Évoli', es: 'Eevee', de: 'Evoli' },
+  150: { en: 'Mewtwo', fr: 'Mewtwo', es: 'Mewtwo', de: 'Mewtu' },
+  849: { en: 'Toxtricity', fr: 'Salarsen', es: 'Toxtricity', de: 'Riffex' },
+}
+
+/** Le Pokédex dans une langue (le français sert pour préparer les données). */
+export const dexIn = (lang: keyof (typeof NAMES)[1]): Pokemon[] =>
+  Object.entries(NAMES).map(([id, names]) => ({
+    id: Number(id),
+    name: names[lang],
+  }))
+
+export const DEX = dexIn('fr')
 
 const byName = (name: string): Pokemon => DEX.find((p) => p.name === name)!
 
@@ -25,21 +34,25 @@ const PIXEL = Buffer.from(
 
 /** Simule PokéAPI, les sprites et les polices : aucun appel réseau externe. */
 async function mockExternal(page: Page): Promise<void> {
-  await page.route('https://beta.pokeapi.co/graphql/**', (route) =>
-    route.fulfill({
+  // Les noms dans la langue demandée (variable GraphQL `lang`)
+  await page.route('https://beta.pokeapi.co/graphql/**', (route) => {
+    const { lang } = route.request().postDataJSON().variables
+    return route.fulfill({
       json: {
         data: {
-          pokemon_v2_pokemonspeciesname: DEX.map((p) => ({
+          pokemon_v2_pokemonspeciesname: dexIn(lang).map((p) => ({
             name: p.name,
             pokemon_species_id: p.id,
           })),
         },
       },
-    }),
-  )
+    })
+  })
   await page.route('https://pokeapi.co/**', (route) =>
     route.fulfill({ status: 500 }),
   )
+  // Fiches /pokemon/[name] : servies par le faux PokéAPI (e2e/mock-pokeapi.mjs),
+  // appelé par le serveur Nuxt (SSR) comme par le navigateur.
   await page.route('https://raw.githubusercontent.com/**', (route) =>
     route.fulfill({ body: PIXEL, contentType: 'image/png' }),
   )
@@ -51,10 +64,15 @@ export interface WishlistApi {
   list(): Promise<WishlistItem[]>
   /** Ajoute des Pokémon du DEX par leur nom (et les marque capturés si demandé) */
   seed(names: string[], options?: { caught?: string[] }): Promise<void>
+  /** Retire un Pokémon du DEX côté API, dans le dos de la page */
+  remove(name: string): Promise<void>
   reset(): Promise<void>
 }
 
-/** Les éléments de la page que les tests manipulent. */
+/**
+ * Les éléments de la page que les tests manipulent, en FRANÇAIS (/fr).
+ * L'anglais par défaut et le changement de langue : voir i18n.spec.ts.
+ */
 export interface PokewishPage {
   goto(): Promise<void>
   search: Locator
@@ -72,7 +90,19 @@ export const test = base.extend<{
   api: WishlistApi
   app: PokewishPage
   pageErrors: string[]
+  pokeApi: undefined
 }>({
+  // PokéAPI, sprites et polices simulés pour TOUS les tests : aucun ne peut
+  // appeler le vrai réseau par oubli. Un test peut ajouter ses propres
+  // page.route(), qui passent avant (les plus récentes gagnent).
+  pokeApi: [
+    async ({ page }, use) => {
+      await mockExternal(page)
+      await use(undefined)
+    },
+    { auto: true },
+  ],
+
   // Chaque test part d'une wishlist vide côté API — même ceux qui n'utilisent
   // pas `api` (auto), sinon un test hériterait de l'état du précédent
   api: [
@@ -80,6 +110,9 @@ export const test = base.extend<{
       const api: WishlistApi = {
         async list() {
           return (await request.get(`${API_URL}/wishlist`)).json()
+        },
+        async remove(name) {
+          await request.delete(`${API_URL}/wishlist/${byName(name).id}`)
         },
         async reset() {
           for (const item of await api.list()) {
@@ -118,8 +151,6 @@ export const test = base.extend<{
   ],
 
   app: async ({ page }, use) => {
-    await mockExternal(page)
-
     const search = page.getByRole('searchbox', {
       name: 'Rechercher un Pokémon par nom ou numéro',
     })
@@ -131,7 +162,7 @@ export const test = base.extend<{
       results,
       wishlist,
       async goto() {
-        await page.goto('/')
+        await page.goto('/fr')
         // Pokédex chargé et wishlist récupérée depuis l'API
         await expect(search).toBeEnabled()
         await expect(page.getByText("Connexion à l'API")).toBeHidden()

@@ -94,33 +94,36 @@ describe('setCaught / removePokemon', () => {
 })
 
 describe('createWishlistStore (tableau en mémoire)', () => {
-  it('part vide par défaut', () => {
-    expect(createWishlistStore().all()).toEqual([])
+  it('part vide par défaut', async () => {
+    expect(await createWishlistStore().all()).toEqual([])
   })
 
-  it('add renvoie le nouvel élément ou la raison du refus', () => {
+  it('add renvoie le nouvel élément ou la raison du refus', async () => {
     const store = createWishlistStore()
-    expect(store.add(pikachu)).toEqual({
+    expect(await store.add(pikachu)).toEqual({
       item: { id: 25, name: 'Pikachu', caught: false },
     })
-    expect(store.add(pikachu)).toEqual({ error: 'DUPLICATE' })
-    expect(createWishlistStore(makeList(6)).add(pikachu)).toEqual({
+    expect(await store.add(pikachu)).toEqual({ error: 'DUPLICATE' })
+    expect(await createWishlistStore(makeList(6)).add(pikachu)).toEqual({
       error: 'WISHLIST_FULL',
     })
   })
 
-  it('remove et setCaught signalent un Pokémon absent', () => {
+  it('remove et setCaught signalent un Pokémon absent', async () => {
     const store = createWishlistStore([{ ...pikachu, caught: false }])
-    expect(store.setCaught(25, true)).toEqual({ ...pikachu, caught: true })
-    expect(store.setCaught(999, true)).toBeNull()
-    expect(store.remove(999)).toBe(false)
-    expect(store.remove(25)).toBe(true)
-    expect(store.all()).toEqual([])
+    expect(await store.setCaught(25, true)).toEqual({
+      ...pikachu,
+      caught: true,
+    })
+    expect(await store.setCaught(999, true)).toBeNull()
+    expect(await store.remove(999)).toBe(false)
+    expect(await store.remove(25)).toBe(true)
+    expect(await store.all()).toEqual([])
   })
 
-  it('deux stores sont indépendants', () => {
+  it('deux stores sont indépendants', async () => {
     const a = createWishlistStore()
-    a.add(pikachu)
-    expect(createWishlistStore().all()).toEqual([])
+    await a.add(pikachu)
+    expect(await createWishlistStore().all()).toEqual([])
   })
 })

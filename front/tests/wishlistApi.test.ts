@@ -10,6 +10,7 @@ import {
 } from '../app/utils/wishlistApi'
 
 const BASE = 'http://api.test'
+const API = { base: BASE, lang: 'fr' }
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -35,8 +36,21 @@ describe('getWishlist', () => {
   it('GET /wishlist -> la liste', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([pikachu]))
 
-    await expect(getWishlist(BASE)).resolves.toEqual([pikachu])
+    await expect(getWishlist(API)).resolves.toEqual([pikachu])
     expect(fetchMock.mock.calls[0]![0]).toBe(`${BASE}/wishlist`)
+  })
+
+  it("envoie la langue de l'interface dans Accept-Language", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse([]))
+
+    await getWishlist({ base: BASE, lang: 'de' })
+    await getWishlist({ base: BASE })
+
+    const headers = fetchMock.mock.calls.map(
+      ([, init]) =>
+        (init?.headers as Record<string, string>)['Accept-Language'],
+    )
+    expect(headers).toEqual(['de', undefined])
   })
 })
 
@@ -45,7 +59,7 @@ describe('addToWishlist', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(pikachu, 201))
 
     await expect(
-      addToWishlist(BASE, { id: 25, name: 'Pikachu' }),
+      addToWishlist(API, { id: 25, name: 'Pikachu' }),
     ).resolves.toEqual(pikachu)
 
     const [url, init] = fetchMock.mock.calls[0]!
@@ -62,14 +76,14 @@ describe('addToWishlist', () => {
       ),
     )
 
-    const error = await addToWishlist(BASE, { id: 25, name: 'Pikachu' }).catch(
+    const error = await addToWishlist(API, { id: 25, name: 'Pikachu' }).catch(
       (e: unknown) => e,
     )
     expect(error).toBeInstanceOf(WishlistApiError)
     expect(error).toMatchObject({
       status: 409,
       code: 'WISHLIST_FULL',
-      message: 'La wishlist est pleine.',
+      apiMessage: 'La wishlist est pleine.',
     })
   })
 })
@@ -78,7 +92,7 @@ describe('setWishlistCaught', () => {
   it('PATCH /wishlist/:id avec { caught }', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...pikachu, caught: true }))
 
-    await expect(setWishlistCaught(BASE, 25, true)).resolves.toMatchObject({
+    await expect(setWishlistCaught(API, 25, true)).resolves.toMatchObject({
       caught: true,
     })
     const [url, init] = fetchMock.mock.calls[0]!
@@ -91,7 +105,7 @@ describe('removeFromWishlist', () => {
   it('DELETE /wishlist/:id -> 204 sans corps', async () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }))
 
-    await expect(removeFromWishlist(BASE, 25)).resolves.toBeUndefined()
+    await expect(removeFromWishlist(API, 25)).resolves.toBeUndefined()
     expect(fetchMock.mock.calls[0]![1]?.method).toBe('DELETE')
   })
 
@@ -100,7 +114,7 @@ describe('removeFromWishlist', () => {
       jsonResponse({ error: 'NOT_FOUND', message: 'Absent.' }, 404),
     )
 
-    await expect(removeFromWishlist(BASE, 25)).rejects.toMatchObject({
+    await expect(removeFromWishlist(API, 25)).rejects.toMatchObject({
       status: 404,
       code: 'NOT_FOUND',
     })
@@ -111,19 +125,20 @@ describe('erreurs génériques', () => {
   it('API éteinte : status 0 et message explicite', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'))
 
-    await expect(getWishlist(BASE)).rejects.toMatchObject({
+    await expect(getWishlist(API)).rejects.toMatchObject({
       status: 0,
-      message: expect.stringContaining('injoignable'),
+      code: 'NETWORK',
+      apiMessage: null,
     })
   })
 
   it('erreur sans corps JSON : message par défaut avec le code HTTP', async () => {
     fetchMock.mockResolvedValueOnce(new Response('oops', { status: 500 }))
 
-    await expect(getWishlist(BASE)).rejects.toMatchObject({
+    await expect(getWishlist(API)).rejects.toMatchObject({
       status: 500,
       code: null,
-      message: "L'API a répondu 500.",
+      apiMessage: null,
     })
   })
 })
