@@ -1,7 +1,7 @@
 name: CI
 
 # Chaque push (toutes branches) lance la CI, visible dans l'onglet Actions.
-# Les déploiements ne tournent que sur main.
+# Le déploiement du front (Vercel) ne tourne que sur main.
 on:
   push:
 
@@ -11,7 +11,9 @@ on:
 #      API · Paquet Lambda
 #   3. API · Build + /health  /  Build
 #   4. E2E (Playwright)
-#   5. Deploy (AWS Lambda) -> Deploy (Vercel)       (main uniquement)
+#   5. Deploy (Vercel)                              (main uniquement)
+#
+# L'API (AWS Lambda) se déploie à la main : cd back && npm run deploy:lambda
 #
 # Les jobs « Install » font npm ci une seule fois et mettent node_modules en
 # cache ; les jobs suivants le restaurent au lieu de tout réinstaller.
@@ -115,8 +117,9 @@ jobs:
           fail-on-cache-miss: true
       - run: ${{ matrix.check.run }}
 
-  # Paquet Lambda (un seul fichier, bundlé par esbuild), réutilisé tel quel
-  # par le déploiement : on déploie exactement ce qui a été construit ici.
+  # Vérifie que le paquet Lambda (un seul fichier, bundlé par esbuild) se
+  # construit. Le déploiement de la Lambda se fait à la main :
+  # cd back && npm run deploy:lambda
   api-package:
     name: API · Paquet Lambda
     needs: [api-install]
@@ -135,11 +138,6 @@ jobs:
           key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
           fail-on-cache-miss: true
       - run: npm run package:lambda
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lambda-zip
-          path: back/lambda.zip
-          retention-days: 7
 
   # ----------------------------------------------------- 2. Contrôles (front)
 
@@ -263,58 +261,15 @@ jobs:
 
   # ------------------------------------------------- 5. Déploiements (main)
 
-  # Met à jour le CODE de la Lambda avec le paquet construit plus haut ; sa
-  # configuration (DATABASE_URL, CORS) reste dans AWS (npm run deploy:lambda).
-  # Authentification AWS par OIDC : aucune clé AWS stockée dans GitHub
-  # (rôle créé par back/scripts/setup-github-deploy.sh).
-  deploy-lambda:
-    name: Deploy (AWS Lambda)
-    needs: [e2e, api-package]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    # Deux déploiements ne se chevauchent jamais
-    concurrency:
-      group: deploy-lambda
-      cancel-in-progress: false
-    permissions:
-      id-token: write # jeton OIDC pour AWS
-      contents: read
-    env:
-      AWS_REGION: eu-north-1
-      FUNCTION: pokewish-api
-      API_URL: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: lambda-zip
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::805815160134:role/pokewish-github-deploy
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Mise à jour du code de la Lambda
-        run: |
-          aws lambda update-function-code --function-name "$FUNCTION" \
-            --zip-file fileb://lambda.zip --query LastModified --output text
-          aws lambda wait function-updated --function-name "$FUNCTION"
-      - name: Vérification via AWS (/health et /wishlist)
-        run: |
-          for route in /health /wishlist; do
-            echo "GET $route"
-            curl -sf --retry 3 --retry-all-errors "$API_URL$route"
-            echo
-          done
-
-  # Front Nuxt (SSR) sur Vercel, après la mise à jour de l'API.
+  # Front Nuxt (SSR) sur Vercel, une fois E2E et builds verts.
   # Secrets GitHub : VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID ;
   # variable GitHub : FRONT_URL (vérification SSR après déploiement).
   deploy-vercel:
     name: Deploy (Vercel)
-    needs: [deploy-lambda, build]
+    needs: [e2e, build, api-package]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Secrets et variable Vercel rangés dans l'environnement GitHub « prod ».
-    # (Pas sur deploy-lambda : un environnement change l'identité OIDC envoyée
-    # à AWS, qui n'accepte que …:ref:refs/heads/main.)
+    # Secrets et variable Vercel rangés dans l'environnement GitHub « prod »
     environment:
       name: prod
       url: ${{ vars.FRONT_URL }}
