@@ -54,7 +54,9 @@
     "height": "Height",
     "weight": "Weight",
     "stats": "Base stats",
-    "noData": "No data to show."
+    "noData": "No data to show.",
+    "like": "Like {name}",
+    "unlike": "Remove your like from {name}"
   },
   "types": {
     "normal": "Normal",

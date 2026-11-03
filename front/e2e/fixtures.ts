@@ -66,6 +66,10 @@ export interface WishlistApi {
   seed(names: string[], options?: { caught?: string[] }): Promise<void>
   /** Retire un Pokémon du DEX côté API, dans le dos de la page */
   remove(name: string): Promise<void>
+  /** Nombre de likes d'un Pokémon, lu dans l'API */
+  likes(id: number): Promise<number>
+  /** Ajoute des likes côté API (comme d'autres visiteurs) */
+  like(id: number, times?: number): Promise<void>
   reset(): Promise<void>
 }
 
@@ -113,6 +117,15 @@ export const test = base.extend<{
         },
         async remove(name) {
           await request.delete(`${API_URL}/wishlist/${byName(name).id}`)
+        },
+        async likes(id) {
+          return (await (await request.get(`${API_URL}/likes/${id}`)).json())
+            .likes
+        },
+        async like(id, times = 1) {
+          for (let i = 0; i < times; i++) {
+            await request.post(`${API_URL}/likes/${id}`)
+          }
         },
         async reset() {
           for (const item of await api.list()) {

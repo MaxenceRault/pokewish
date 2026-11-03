@@ -25,6 +25,14 @@ const notFound = computed(
   () => status.value === 'success' && pokemon.value === null,
 )
 
+// Likes : compteur partagé (API), chargé dans le navigateur
+const {
+  count: likes,
+  liked,
+  pending: likePending,
+  toggle: toggleLike,
+} = useLikes(computed(() => pokemon.value?.id))
+
 // Pokémon inexistant : vrai code HTTP 404 dans la réponse du serveur
 if (import.meta.server && notFound.value) {
   setResponseStatus(useRequestEvent()!, 404)
@@ -147,6 +155,22 @@ const format = (n: number) => n.toLocaleString(locale.value)
                   <dd>{{ format(pokemon.weight) }} kg</dd>
                 </div>
               </dl>
+              <button
+                type="button"
+                class="like"
+                :class="{ 'like--on': liked }"
+                :aria-pressed="liked"
+                :aria-label="
+                  t(liked ? 'pokemon.unlike' : 'pokemon.like', {
+                    name: pokemon.name,
+                  })
+                "
+                :disabled="likePending || likes === null"
+                @click="toggleLike"
+              >
+                <span aria-hidden="true">{{ liked ? '♥' : '♡' }}</span>
+                <span class="like__count">{{ likes ?? '–' }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -313,6 +337,44 @@ const format = (n: number) => n.toLocaleString(locale.value)
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), #48b07f);
+}
+
+.like {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(31 43 34 / 0.08);
+  color: var(--ink);
+  font-size: 22px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+.like:hover:not(:disabled) {
+  background: rgb(31 43 34 / 0.14);
+}
+.like:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.like:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.like:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.like--on {
+  background: var(--red);
+  color: #fff;
+}
+.like--on:hover:not(:disabled) {
+  background: var(--red-lo);
 }
 
 .empty .retry {

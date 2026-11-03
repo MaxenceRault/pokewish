@@ -10,16 +10,19 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null
 
 /** `:id` doit être un entier positif (numéro de Pokédex). */
-const idParam = validator('param', (value: Record<string, string>, c) => {
-  const id = Number(value.id)
-  if (!Number.isInteger(id) || id <= 0) {
-    return c.json<ApiError>(
-      { error: 'INVALID_ID', message: t(c, 'INVALID_ID') },
-      400,
-    )
-  }
-  return { id }
-})
+export const idParam = validator(
+  'param',
+  (value: Record<string, string>, c) => {
+    const id = Number(value.id)
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json<ApiError>(
+        { error: 'INVALID_ID', message: t(c, 'INVALID_ID') },
+        400,
+      )
+    }
+    return { id }
+  },
+)
 
 /** Corps de POST : { id: entier > 0, name: texte non vide } */
 const pokemonBody = validator('json', (value: unknown, c) => {

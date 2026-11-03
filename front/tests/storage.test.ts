@@ -4,9 +4,12 @@
 // du Pokédex (noms dans chaque langue), pour ne pas rappeler PokéAPI à chaque visite.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  LIKED_KEY,
   loadDexCache,
+  loadLiked,
   readStorage,
   saveDexCache,
+  saveLiked,
   writeStorage,
 } from '../app/utils/storage'
 import { dexCacheKey } from '../app/utils/wishlist'
@@ -92,18 +95,36 @@ describe('JSON invalide', () => {
 
 describe('stockage inaccessible (navigation privée, quota plein…)', () => {
   it('lecture impossible : renvoie [] au lieu de planter', () => {
-    vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
       throw new DOMException('Accès refusé', 'SecurityError')
     })
     expect(readStorage(KEY)).toBeNull()
     expect(loadDexCache('fr')).toEqual([])
+    // restoreAllMocks ne suffit pas avec le localStorage de happy-dom
+    spy.mockRestore()
   })
 
   it('écriture impossible : renvoie false au lieu de planter', () => {
-    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('Quota dépassé', 'QuotaExceededError')
     })
     expect(saveDexCache('fr', dex)).toBe(false)
     expect(writeStorage('x', 'y')).toBe(false)
+    spy.mockRestore()
+  })
+})
+
+describe('Pokémon likés par ce navigateur', () => {
+  it('sauvegarde et relit la liste', () => {
+    saveLiked([25, 133])
+    expect(loadLiked()).toEqual([25, 133])
+  })
+
+  it('vide ou corrompu : liste vide, sans erreur', () => {
+    expect(loadLiked()).toEqual([])
+    localStorage.setItem(LIKED_KEY, '{oups')
+    expect(loadLiked()).toEqual([])
+    localStorage.setItem(LIKED_KEY, '[25, "x", null]')
+    expect(loadLiked()).toEqual([25])
   })
 })

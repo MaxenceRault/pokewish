@@ -1,5 +1,6 @@
 import postgres, { type Sql } from 'postgres'
 import type { WishlistItem } from './types.js'
+import type { LikesStore } from './likes.js'
 import { MAX_WISHLIST, type WishlistStore } from './wishlist.js'
 
 /**
@@ -88,6 +89,36 @@ export function createPostgresStore(sql: Sql): WishlistStore {
         returning pokemon_id, name, caught
       `
       return row ? toItem(row) : null
+    },
+  }
+}
+
+/** Les likes dans la table `likes` (migration 001), requêtes paramétrées. */
+export function createPostgresLikesStore(sql: Sql): LikesStore {
+  return {
+    async get(id) {
+      const [row] = await sql<{ count: number }[]>`
+        select count from likes where pokemon_id = ${id}
+      `
+      return row?.count ?? 0
+    },
+    async like(id) {
+      // Une seule requête, atomique : deux likes simultanés comptent pour 2
+      const [row] = await sql<{ count: number }[]>`
+        insert into likes (pokemon_id, count) values (${id}, 1)
+        on conflict (pokemon_id)
+        do update set count = likes.count + 1, updated_at = now()
+        returning count
+      `
+      return row!.count
+    },
+    async unlike(id) {
+      const [row] = await sql<{ count: number }[]>`
+        update likes set count = greatest(count - 1, 0), updated_at = now()
+        where pokemon_id = ${id}
+        returning count
+      `
+      return row?.count ?? 0
     },
   }
 }

@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { pickLanguage, t } from './i18n.js'
+import { createLikesStore, type LikesStore } from './likes.js'
+import { likesRoutes } from './routes/likes.js'
 import { wishlistRoutes } from './routes/wishlist.js'
 import type { ApiError } from './types.js'
 import { createWishlistStore, type WishlistStore } from './wishlist.js'
@@ -21,7 +23,10 @@ function isAllowedOrigin(origin: string): boolean {
 // L'app est séparée du serveur (index.ts) pour pouvoir la tester
 // avec app.request(), sans ouvrir de port. Chaque test peut lui passer
 // son propre store pour partir d'une wishlist connue.
-export function createApp(store: WishlistStore = createWishlistStore()) {
+export function createApp(
+  store: WishlistStore = createWishlistStore(),
+  likes: LikesStore = createLikesStore(),
+) {
   return (
     new Hono()
       .use(
@@ -42,6 +47,7 @@ export function createApp(store: WishlistStore = createWishlistStore()) {
         c.json<HealthResponse>({ status: 'ok', uptime: process.uptime() }),
       )
       .route('/wishlist', wishlistRoutes(store))
+      .route('/likes', likesRoutes(likes))
       // Erreur inattendue (ex. base injoignable) : 500 en JSON, détail dans les logs
       .onError((error, c) => {
         // Erreurs HTTP voulues (ex. 400 JSON mal formé) : renvoyées telles quelles

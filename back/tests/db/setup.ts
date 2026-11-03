@@ -5,13 +5,15 @@
 // - Chaque fichier de test a SON schéma (Vitest lance les fichiers en
 //   parallèle) : créé avant les tests, vidé avant chaque test, supprimé à la
 //   fin. La table `wishlist` de l'app (schéma public) n'est jamais touchée.
-import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach } from 'vitest'
-import { connect, createPostgresStore } from '../../src/db.js'
+import {
+  connect,
+  createPostgresLikesStore,
+  createPostgresStore,
+} from '../../src/db.js'
+import { runMigrations } from '../../src/migrations.js'
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
-
-const INIT_SQL = new URL('../../db/init.sql', import.meta.url)
 
 /** À appeler dans un `describe.skipIf(!TEST_DATABASE_URL)`. */
 export function useTestDatabase(schema: `pokewish_test_${string}`) {
@@ -22,13 +24,13 @@ export function useTestDatabase(schema: `pokewish_test_${string}`) {
     await sql`drop schema if exists ${sql(schema)} cascade`
     await sql`create schema ${sql(schema)}`
     await sql`set search_path to ${sql(schema)}`
-    // Le vrai schéma de l'app : celui que db:migrate exécute en production
-    await sql.unsafe(await readFile(INIT_SQL, 'utf8'))
+    // Le vrai schéma de l'app : les migrations que db:migrate applique en production
+    await runMigrations(sql)
   })
 
-  // init.sql insère 2 Pokémon d'exemple : chaque test repart d'une table vide
+  // 000_init insère 2 Pokémon d'exemple : chaque test repart de tables vides
   beforeEach(async () => {
-    await sql`truncate wishlist`
+    await sql`truncate wishlist, likes`
   })
 
   afterAll(async () => {
@@ -36,5 +38,9 @@ export function useTestDatabase(schema: `pokewish_test_${string}`) {
     await sql.end()
   })
 
-  return { sql, store: createPostgresStore(sql) }
+  return {
+    sql,
+    store: createPostgresStore(sql),
+    likes: createPostgresLikesStore(sql),
+  }
 }
