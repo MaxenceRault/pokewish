@@ -2,10 +2,21 @@ import postgres, { type Sql } from 'postgres'
 import type { WishlistItem } from './types.js'
 import { MAX_WISHLIST, type WishlistStore } from './wishlist.js'
 
-/** Connexion PostgreSQL (Supabase : URI du « Session pooler »). */
+/**
+ * Connexion PostgreSQL. Supabase propose deux poolers :
+ * - « Session » (port 5432) : serveur Node, tests ;
+ * - « Transaction » (port 6543) : recommandé pour Lambda (beaucoup de
+ *   connexions courtes). Il ne gère pas les requêtes préparées : on les coupe.
+ */
 export function connect(url: string, options: { max?: number } = {}): Sql {
-  // prefer : SSL si le serveur le propose (Supabase), sinon en clair (CI locale)
-  return postgres(url, { ssl: 'prefer', onnotice: () => {}, ...options })
+  const transactionPooler = new URL(url).port === '6543'
+  return postgres(url, {
+    // prefer : SSL si le serveur le propose (Supabase), sinon en clair (CI locale)
+    ssl: 'prefer',
+    prepare: !transactionPooler,
+    onnotice: () => {},
+    ...options,
+  })
 }
 
 interface Row {

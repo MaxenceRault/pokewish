@@ -27,3 +27,7 @@ logs
 playwright-report
 test-results
 blob-report
+
+# Paquet AWS Lambda (npm run build:lambda)
+dist-lambda
+lambda.zip
