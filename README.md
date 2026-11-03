@@ -52,6 +52,28 @@ Dans la CI, ils tournent contre un PostgreSQL 17 jetable (service GitHub Actions
 
 Les erreurs ont toutes la forme `{ "error": "CODE", "message": "…" }`.
 
+## Déploiement de l'API (AWS Lambda)
+
+L'API tourne sur **AWS Lambda** derrière **API Gateway** (HTTP API), région
+`eu-north-1` comme la base Supabase. Même app Hono que le serveur Node : seul
+le point d'entrée change ([back/src/lambda.ts](back/src/lambda.ts)).
+
+```bash
+cd back && npm run deploy:lambda   # manuel, pas dans la CI
+```
+
+Le script (rejouable) construit le paquet, crée ou met à jour le rôle IAM, la
+Lambda et l'API Gateway, puis vérifie `/health` et `/wishlist`. Il lit
+`back/.env` et passe à la Lambda :
+
+- `DATABASE_URL` : pooler Supabase « Transaction » (port 6543), déduit de
+  `DATABASE_URL` ou fourni via `LAMBDA_DATABASE_URL` ;
+- `CORS_ORIGINS` : origines du front autorisées (`LAMBDA_CORS_ORIGINS`,
+  défaut `http://localhost:3000`).
+
+Front branché sur l'API AWS :
+`NUXT_PUBLIC_API_BASE=https://<id>.execute-api.eu-north-1.amazonaws.com npm run dev`
+
 ## Tests e2e (Playwright)
 
 ```bash
