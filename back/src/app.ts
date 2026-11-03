@@ -12,7 +12,7 @@ export interface HealthResponse {
 function isAllowedOrigin(origin: string): boolean {
   const allowed = process.env.CORS_ORIGINS
   if (allowed) return allowed.split(',').some((o) => o.trim() === origin)
-  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+  return origin === 'http://localhost:3000'
 }
 
 // L'app est séparée du serveur (index.ts) pour pouvoir la tester
