@@ -2,6 +2,10 @@
 # Déploie l'API Hono sur AWS Lambda + API Gateway (HTTP API).
 # Rejouable : crée ce qui manque, met à jour le reste.
 #
+# À lancer à la main pour créer l'infrastructure ou changer sa configuration
+# (DATABASE_URL, CORS). Ensuite, chaque push sur main met à jour le CODE de la
+# Lambda via la CI (job « Déploiement AWS Lambda »).
+#
 #   cd back && npm run deploy:lambda
 #
 # Lit back/.env :
@@ -29,9 +33,7 @@ aws() { command aws --region "$REGION" --output text "$@"; }
 step() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
 
 step "Paquet Lambda"
-npm run build:lambda --silent
-rm -f lambda.zip
-(cd dist-lambda && zip -q ../lambda.zip index.mjs)
+npm run package:lambda --silent
 echo "lambda.zip : $(du -h lambda.zip | cut -f1)"
 
 # Variables d'environnement en JSON : l'URL contient : @ / qui cassent la
@@ -98,9 +100,9 @@ aws lambda add-permission --function-name "$FUNCTION" \
 URL=$(aws apigatewayv2 get-api --api-id "$API_ID" --query ApiEndpoint)
 
 step "Vérification"
-for path in /health /wishlist; do
-  printf '%-10s ' "$path"
-  curl -s -w '  -> HTTP %{http_code}\n' "$URL$path"
+for route in /health /wishlist; do
+  printf '%-10s ' "$route"
+  curl -s -w '  -> HTTP %{http_code}\n' "$URL$route"
 done
 
 printf '\n\033[1mAPI déployée : %s\033[0m\n' "$URL"

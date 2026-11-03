@@ -174,3 +174,54 @@ jobs:
           name: playwright-report
           path: front/playwright-report
           retention-days: 7
+
+  # Déploiement continu : sur main uniquement, et seulement si TOUS les
+  # contrôles ci-dessus sont verts. Met à jour le CODE de la Lambda ; sa
+  # configuration (DATABASE_URL, CORS) reste dans AWS (npm run deploy:lambda).
+  # Authentification AWS par OIDC : aucune clé AWS stockée dans GitHub
+  # (rôle créé par back/scripts/setup-github-deploy.sh).
+  deploy:
+    name: Déploiement AWS Lambda
+    needs: [locales, lint, prettier, typecheck, test, build, e2e]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Deux déploiements ne se chevauchent jamais
+    concurrency:
+      group: deploy-lambda
+      cancel-in-progress: false
+    permissions:
+      id-token: write # jeton OIDC pour AWS
+      contents: read
+    env:
+      AWS_REGION: eu-north-1
+      FUNCTION: pokewish-api
+      API_URL: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
+    defaults:
+      run:
+        working-directory: back
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: back/package-lock.json
+      - run: npm ci
+      - name: Paquet Lambda
+        run: npm run package:lambda
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::805815160134:role/pokewish-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Mise à jour du code de la Lambda
+        run: |
+          aws lambda update-function-code --function-name "$FUNCTION" \
+            --zip-file fileb://lambda.zip --query LastModified --output text
+          aws lambda wait function-updated --function-name "$FUNCTION"
+      - name: Vérification via AWS (/health et /wishlist)
+        run: |
+          for route in /health /wishlist; do
+            echo "GET $route"
+            curl -sf --retry 3 --retry-all-errors "$API_URL$route"
+            echo
+          done
