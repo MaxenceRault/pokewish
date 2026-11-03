@@ -1,6 +1,6 @@
--- PokéWish : schéma de base de la wishlist
--- Exécution : npm run db:migrate (ou à la main dans Supabase > SQL Editor)
--- Rejouable sans risque : rien n'est recréé ni écrasé s'il existe déjà.
+-- Migration 000 : schéma de base de la wishlist.
+-- Écrite pour être sûre sur une base existante (créée avant le runner) :
+-- rien n'est recréé ni écrasé s'il existe déjà.
 
 create table if not exists wishlist (
   pokemon_id  integer     primary key check (pokemon_id > 0), -- n° du Pokédex : pas de doublon

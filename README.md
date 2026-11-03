@@ -28,9 +28,15 @@ sur un tableau en mémoire (perdu au redémarrage) : c'est le cas dans la CI.
 ```bash
 cd back
 cp .env.example .env    # puis remplir DATABASE_URL (Supabase > Connect > Session pooler)
-npm run db:migrate      # crée la table (rejouable sans risque)
+npm run db:migrate      # applique les migrations pas encore appliquées
 npm run dev             # « Wishlist : PostgreSQL (DATABASE_URL) »
 ```
+
+**Migrations** : `back/db/migrations/NNN_nom.sql`, appliquées dans l'ordre
+par un runner maison ([back/src/migrations.ts](back/src/migrations.ts)). La
+table `schema_migrations` retient celles déjà appliquées : chacune ne
+s'exécute qu'une fois, dans une transaction (rien d'appliqué à moitié), sous
+verrou. `000_init` = la wishlist, `001_likes` = les likes.
 
 Tests des routes sur une **vraie base**, sans mock SQL (`back/tests/db/`) :
 CRUD, doublons, limite de 6, persistance. Chaque fichier travaille dans un
@@ -49,6 +55,9 @@ Dans la CI, ils tournent contre un PostgreSQL 17 jetable (service GitHub Actions
 | `POST /wishlist`       | `{ "id": 25, "name" }` | 201, 400, 409 `DUPLICATE` / `WISHLIST_FULL` |
 | `PATCH /wishlist/:id`  | `{ "caught": true }`   | 200, 400, 404                               |
 | `DELETE /wishlist/:id` |                        | 204, 400, 404                               |
+| `GET /likes/:id`       |                        | 200 `{ "id", "likes" }`, 400                |
+| `POST /likes/:id`      |                        | 200 (+1), 400                               |
+| `DELETE /likes/:id`    |                        | 200 (−1, jamais sous 0), 400                |
 
 Les erreurs ont toutes la forme `{ "error": "CODE", "message": "…" }`.
 

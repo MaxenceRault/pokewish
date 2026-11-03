@@ -87,3 +87,30 @@ export function setWishlistCaught(
 export function removeFromWishlist(api: ApiTarget, id: number): Promise<void> {
   return request(api, `/wishlist/${id}`, { method: 'DELETE' })
 }
+
+/** Réponse des routes /likes/:id */
+export interface LikesResponse {
+  id: number
+  likes: number
+}
+
+/** GET /likes/:id -> nombre de likes */
+export function getLikes(api: ApiTarget, id: number): Promise<LikesResponse> {
+  return request(api, `/likes/${id}`)
+}
+
+/** POST /likes/:id -> +1, renvoie le nouveau total */
+export function likePokemon(
+  api: ApiTarget,
+  id: number,
+): Promise<LikesResponse> {
+  return request(api, `/likes/${id}`, { method: 'POST' })
+}
+
+/** DELETE /likes/:id -> −1, renvoie le nouveau total */
+export function unlikePokemon(
+  api: ApiTarget,
+  id: number,
+): Promise<LikesResponse> {
+  return request(api, `/likes/${id}`, { method: 'DELETE' })
+}

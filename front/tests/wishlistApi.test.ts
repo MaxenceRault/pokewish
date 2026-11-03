@@ -3,8 +3,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addToWishlist,
+  getLikes,
   getWishlist,
+  likePokemon,
   removeFromWishlist,
+  unlikePokemon,
   setWishlistCaught,
   WishlistApiError,
 } from '../app/utils/wishlistApi'
@@ -140,5 +143,26 @@ describe('erreurs génériques', () => {
       code: null,
       apiMessage: null,
     })
+  })
+})
+
+describe('likes', () => {
+  it('GET / POST / DELETE /likes/:id renvoient le total', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ id: 25, likes: 3 }))
+      .mockResolvedValueOnce(jsonResponse({ id: 25, likes: 4 }))
+      .mockResolvedValueOnce(jsonResponse({ id: 25, likes: 3 }))
+
+    expect(await getLikes(API, 25)).toEqual({ id: 25, likes: 3 })
+    expect(await likePokemon(API, 25)).toEqual({ id: 25, likes: 4 })
+    expect(await unlikePokemon(API, 25)).toEqual({ id: 25, likes: 3 })
+
+    expect(
+      fetchMock.mock.calls.map(([url, init]) => [url, init?.method ?? 'GET']),
+    ).toEqual([
+      [`${BASE}/likes/25`, 'GET'],
+      [`${BASE}/likes/25`, 'POST'],
+      [`${BASE}/likes/25`, 'DELETE'],
+    ])
   })
 })

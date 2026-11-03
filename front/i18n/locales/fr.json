@@ -54,7 +54,9 @@
     "height": "Taille",
     "weight": "Poids",
     "stats": "Statistiques de base",
-    "noData": "Aucune donnée à afficher."
+    "noData": "Aucune donnée à afficher.",
+    "like": "Liker {name}",
+    "unlike": "Retirer ton like de {name}"
   },
   "types": {
     "normal": "Normal",

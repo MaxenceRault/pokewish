@@ -38,3 +38,21 @@ export function saveDexCache(
 ): boolean {
   return writeStorage(dexCacheKey(lang), JSON.stringify(dex), storage)
 }
+
+/** Pokémon que CE navigateur a likés (pour pouvoir annuler son like). */
+export const LIKED_KEY = 'pokewish:liked'
+
+export function loadLiked(storage?: Storage): number[] {
+  try {
+    const data: unknown = JSON.parse(readStorage(LIKED_KEY, storage) ?? '[]')
+    return Array.isArray(data)
+      ? data.filter((id): id is number => Number.isInteger(id))
+      : []
+  } catch {
+    return []
+  }
+}
+
+export function saveLiked(ids: number[], storage?: Storage): boolean {
+  return writeStorage(LIKED_KEY, JSON.stringify(ids), storage)
+}

@@ -54,7 +54,9 @@
     "height": "Altura",
     "weight": "Peso",
     "stats": "Estadísticas base",
-    "noData": "No hay datos que mostrar."
+    "noData": "No hay datos que mostrar.",
+    "like": "Dar me gusta a {name}",
+    "unlike": "Quitar tu me gusta de {name}"
   },
   "types": {
     "normal": "Normal",
