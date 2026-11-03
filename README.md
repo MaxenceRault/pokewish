@@ -74,6 +74,13 @@ npm test              # Vitest
 npm run build         # Build
 ```
 
+À la racine, les traductions du front et du back (chaque langue comparée à
+`en.json` : clés manquantes ou en trop, textes vides, paramètres `{…}`) :
+
+```bash
+node scripts/check-locales.mjs
+```
+
 La CI (`.github/workflows/ci.yml`) lance ces 5 contrôles pour chaque projet à
-chaque push. Pour le back, elle démarre aussi l'API et vérifie que
-`GET /health` répond 200.
+chaque push, plus la vérification des traductions. Pour le back, elle démarre
+aussi l'API et vérifie que `GET /health` répond 200.

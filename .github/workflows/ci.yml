@@ -8,6 +8,17 @@ on:
 # Un job par contrôle et par projet (front = Nuxt, back = API Hono) :
 # chacun apparaît comme une coche séparée, et ils tournent en parallèle.
 jobs:
+  # Traductions front + back : chaque langue doit avoir les clés de en.json
+  locales:
+    name: Traductions (clés des locales)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/check-locales.mjs
+
   lint:
     name: Lint (${{ matrix.project }})
     runs-on: ubuntu-latest
