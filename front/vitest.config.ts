@@ -1,6 +1,9 @@
-import { defineConfig } from 'vitest/config'
+import { defineVitestConfig } from '@nuxt/test-utils/config'
 
-export default defineConfig({
+// defineVitestConfig : les fichiers qui le demandent (// @vitest-environment
+// nuxt, dans tests/nuxt/) tournent dans une vraie app Nuxt (i18n,
+// runtimeConfig, cycle de vie des composants). Les autres restent en Node.
+export default defineVitestConfig({
   test: {
     // Seulement les tests unitaires : e2e/ est pour Playwright
     include: ['tests/**/*.test.ts'],
