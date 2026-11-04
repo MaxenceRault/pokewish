@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@nuxt/eslint": "^1.17.0",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
+    "@vitest/coverage-v8": "^5.0.5",
     "eslint-config-prettier": "^10.1.8",
     "happy-dom": "^21.0.4",
     "prettier": "^3.9.10",

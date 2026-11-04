@@ -1,5 +1,8 @@
 # PokéWish
 
+[![coverage api](https://github.com/MaxenceRault/pokewish/blob/badges/coverage-api.svg?raw=true)](https://github.com/MaxenceRault/pokewish/blob/badges/COVERAGE.md)
+[![coverage front](https://github.com/MaxenceRault/pokewish/blob/badges/coverage-front.svg?raw=true)](https://github.com/MaxenceRault/pokewish/blob/badges/COVERAGE.md)
+
 Wishlist de Pokémon à capturer (6 maximum).
 
 | Dossier  | Contenu                           | Port par défaut |
@@ -109,6 +112,29 @@ bash scripts/setup-github-static-deploy.sh # une fois : droits OIDC de la CI
 NUXT_PUBLIC_API_BASE=https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com npm run generate
 bash scripts/publish-static.sh             # envoi S3 + invalidation CloudFront
 ```
+
+## Production : smoke tests, SEO, rollback
+
+Après chaque déploiement (sur `main`), la CD vérifie la production ; une URL
+critique en échec la fait échouer :
+
+```bash
+node scripts/smoke.mjs      # /health, /wishlist, /likes, pages SSR et SSG, codes HTTP (dont 404)
+node scripts/seo-check.mjs  # HTML des fiches SANS JavaScript : title, h1, description, stats ; SSR = SSG
+```
+
+Si tout est vert, la version est marquée par un tag `stable-<date>`.
+**Rollback** : Actions > **Rollback** > Run workflow. Sans version donnée, le
+dernier tag `stable-*` différent de `main` est reconstruit et redéployé
+(Vercel + S3/CloudFront), puis les smoke tests vérifient la production.
+L'API se restaure à la main : `git checkout stable-… && cd back && npm run deploy:lambda`.
+
+## Couverture des tests
+
+`npm run test:coverage` (dans `front/` ou `back/`) : rapport dans
+`coverage/index.html`. Dans la CI, le job **Coverage** publie le tableau dans
+le résumé du run, le rapport HTML en artefact (`rapport-couverture`), et sur
+`main` les badges ci-dessus (branche `badges`, [COVERAGE.md](https://github.com/MaxenceRault/pokewish/blob/badges/COVERAGE.md)).
 
 ## Tests e2e (Playwright)
 

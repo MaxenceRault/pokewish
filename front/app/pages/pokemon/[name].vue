@@ -46,6 +46,16 @@ useHead(() => ({
       : 'PokéWish',
 }))
 
+// SEO : description et aperçu (réseaux sociaux), présents dans le HTML
+// rendu par le serveur (SSR) comme dans les pages générées (SSG)
+useSeoMeta({
+  description: () => pokemon.value?.description ?? undefined,
+  ogTitle: () =>
+    pokemon.value ? `${pokemon.value.name} · PokéWish` : undefined,
+  ogDescription: () => pokemon.value?.description ?? undefined,
+  ogImage: () => pokemon.value?.image ?? undefined,
+})
+
 /** Couleurs officielles (approximatives) des types, pour les pastilles. */
 const TYPE_COLORS: Record<string, string> = {
   normal: '#9fa19f',

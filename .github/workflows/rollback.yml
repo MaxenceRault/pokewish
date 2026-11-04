@@ -1,0 +1,131 @@
+name: Rollback
+
+# Revenir à une version précédente du front (Vercel + S3/CloudFront).
+# Lancement manuel : Actions > Rollback > Run workflow (branche main).
+#
+# « Version » : un tag stable-* (posé par la CD quand les smoke tests de la
+# production passent). Vide = le dernier déploiement stable qui n'est PAS
+# la version actuelle de main.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag stable-* à restaurer (vide = dernier stable ≠ main)'
+        required: false
+        default: ''
+
+env:
+  NODE_VERSION: 24
+  NUXT_PUBLIC_API_BASE: https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com
+
+# Jamais en même temps qu'un déploiement
+concurrency:
+  group: rollback
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Version à restaurer
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tous les tags
+      - id: pick
+        env:
+          WANTED: ${{ inputs.version }}
+        run: |
+          echo "Versions stables (la plus récente d'abord) :"
+          git tag -l 'stable-*' --sort=-creatordate | head -10
+          if [ -n "$WANTED" ]; then
+            git rev-parse --verify --quiet "refs/tags/$WANTED" >/dev/null \
+              || { echo "Tag introuvable : $WANTED"; exit 1; }
+            ref="$WANTED"
+          else
+            current=$(git rev-parse origin/main)
+            ref=""
+            for tag in $(git tag -l 'stable-*' --sort=-creatordate); do
+              if [ "$(git rev-list -n 1 "$tag")" != "$current" ]; then
+                ref="$tag"; break
+              fi
+            done
+            [ -n "$ref" ] || { echo "Aucune version stable antérieure"; exit 1; }
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Rollback vers \`$ref\`"
+            echo "Commit : $(git rev-list -n 1 "$ref")"
+            git log -1 --format='Message : %s' "$ref"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Front SSR : on redéploie sur Vercel la version du tag
+  rollback-vercel:
+    name: Rollback (Vercel)
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ vars.FRONT_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || vars.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci
+        working-directory: front
+      - run: npx vercel@65 pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - run: npx vercel@65 build --prod --token="$VERCEL_TOKEN"
+        env:
+          NITRO_PRESET: vercel
+      - run: npx vercel@65 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+  # Front SSG : on régénère la version du tag et on la republie sur S3
+  rollback-static:
+    name: Rollback (S3 + CloudFront)
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC pour AWS (rôle limité au bucket et au CDN)
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+      - run: npm ci
+        working-directory: front
+      - run: npm run generate
+        working-directory: front
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::805815160134:role/pokewish-github-deploy
+          aws-region: eu-north-1
+      - run: bash scripts/publish-static.sh
+        working-directory: front
+
+  # La production doit refonctionner après le retour en arrière
+  smoke:
+    name: Smoke tests (prod)
+    needs: [rollback-vercel, rollback-static]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # scripts de main (les plus récents)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: node scripts/smoke.mjs
+      - run: node scripts/seo-check.mjs

@@ -88,7 +88,13 @@ jobs:
           - { name: 'Format (Prettier)', run: 'npm run format:check' }
           - { name: 'Lint (ESLint)', run: 'npm run lint' }
           - { name: 'Typecheck', run: 'npm run typecheck' }
-          - { name: 'Tests (Vitest)', run: 'npm test' }
+          # Avec la base de test : la couverture inclut aussi le code SQL
+          - {
+              name: 'Tests (Vitest)',
+              run: 'npm run test:coverage',
+              db: true,
+              coverage: api,
+            }
           - { name: 'Tests BDD (Postgres)', run: 'npm run test:db', db: true }
     # PostgreSQL jetable, démarré seulement pour « Tests BDD » (image vide = pas de service)
     services:
@@ -116,6 +122,12 @@ jobs:
           key: api-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('back/package-lock.json') }}
           fail-on-cache-miss: true
       - run: ${{ matrix.check.run }}
+      - if: matrix.check.coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.check.coverage }}
+          path: back/coverage
+          retention-days: 14
 
   # Vérifie que le paquet Lambda (un seul fichier, bundlé par esbuild) se
   # construit. Le déploiement de la Lambda se fait à la main :
@@ -152,7 +164,11 @@ jobs:
           - { name: 'Format (Prettier)', run: 'npm run format:check' }
           - { name: 'Lint (ESLint)', run: 'npm run lint' }
           - { name: 'Typecheck', run: 'npm run typecheck' }
-          - { name: 'Tests (Vitest)', run: 'npm test' }
+          - {
+              name: 'Tests (Vitest)',
+              run: 'npm run test:coverage',
+              coverage: front,
+            }
     defaults:
       run:
         working-directory: front
@@ -169,6 +185,57 @@ jobs:
           key: front-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('front/package-lock.json') }}
           fail-on-cache-miss: true
       - run: ${{ matrix.check.run }}
+      - if: matrix.check.coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.check.coverage }}
+          path: front/coverage
+          retention-days: 14
+
+  # Couverture des tests : rapport dans le résumé du run (+ rapport HTML en
+  # artefact) ; sur main, badges et COVERAGE.md publiés sur la branche « badges »
+  # (affichés dans le README).
+  coverage:
+    name: Coverage
+    needs: [api-checks, checks]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # pousser la branche badges
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-api
+          path: back/coverage
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-front
+          path: front/coverage
+      - name: Rapport (résumé du run) + badges
+        run: node scripts/coverage-report.mjs badges-out >> "$GITHUB_STEP_SUMMARY"
+      - name: Rapport HTML détaillé (artefact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-couverture
+          path: |
+            back/coverage
+            front/coverage
+          retention-days: 30
+      - name: Publier les badges (branche badges)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git worktree add --orphan -b badges-publish ../badges
+          cp badges-out/* ../badges/
+          cd ../badges
+          git add -A
+          git commit -m "Couverture ${GITHUB_SHA::7}"
+          git push --force origin HEAD:badges
 
   # ------------------------------------------------------------------ 3. Builds
 
@@ -363,3 +430,41 @@ jobs:
           html=$(curl -sf --retry 5 --retry-all-errors "$SITE_URL/pokemon/pikachu")
           echo "$html" | grep -o '<title>[^<]*</title>'
           echo "$html" | grep -q "$NUXT_PUBLIC_API_BASE" || { echo "API AWS absente"; exit 1; }
+
+  # ----------------------------------------- 6. Contrôle de la production
+
+  # Après les déploiements : /health, une page SSR, une page SSG, les codes
+  # HTTP (dont les 404 attendus), puis le HTML sans JavaScript des fiches
+  # (SEO, SSR = SSG). Une URL critique en échec fait échouer la CD.
+  smoke:
+    name: Smoke tests (prod)
+    needs: [deploy-vercel, deploy-static]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: URL critiques (API, SSR, SSG, codes HTTP)
+        run: node scripts/smoke.mjs
+      - name: SEO — HTML des fiches sans JavaScript (SSR et SSG)
+        run: node scripts/seo-check.mjs
+
+  # Production vérifiée : on marque cette version comme « stable ».
+  # Le workflow Rollback redéploie le dernier tag stable-* en cas de problème.
+  tag-stable:
+    name: Version stable (tag)
+    needs: [smoke]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # pousser le tag
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag stable-<date>
+        run: |
+          tag="stable-$(date -u +%Y%m%d-%H%M%S)"
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "$tag"
+          echo "### Version stable : \`$tag\` ($GITHUB_SHA)" >> "$GITHUB_STEP_SUMMARY"
