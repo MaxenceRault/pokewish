@@ -19,21 +19,18 @@ en 4 langues et tourne en production sur AWS et Vercel.
 ## Sommaire
 
 1. [Fonctionnalités](#fonctionnalités)
-2. [Architecture](#architecture)
-3. [Stack technique](#stack-technique)
-4. [Organisation du dépôt](#organisation-du-dépôt)
-5. [Lancer le projet en local](#lancer-le-projet-en-local)
-6. [API](#api)
-7. [Base de données et migrations](#base-de-données-et-migrations)
-8. [Front : SSR, SSG et langues](#front--ssr-ssg-et-langues)
-9. [Tests](#tests)
-10. [CI/CD](#cicd)
-11. [Déploiements](#déploiements)
-12. [Production : smoke tests, SEO, rollback](#production--smoke-tests-seo-rollback)
-13. [Sécurité](#sécurité)
-14. [Référence des commandes](#référence-des-commandes)
-15. [Historique des étapes](#historique-des-étapes)
-16. [Limites connues](#limites-connues)
+2. [Stack technique](#stack-technique)
+3. [Organisation du dépôt](#organisation-du-dépôt)
+4. [Lancer le projet en local](#lancer-le-projet-en-local)
+5. [API](#api)
+6. [Base de données et migrations](#base-de-données-et-migrations)
+7. [Front : SSR, SSG et langues](#front--ssr-ssg-et-langues)
+8. [Tests](#tests)
+9. [Déploiements](#déploiements)
+10. [Production : smoke tests, SEO, rollback](#production--smoke-tests-seo-rollback)
+11. [Sécurité](#sécurité)
+12. [Référence des commandes](#référence-des-commandes)
+13. [Historique des étapes](#historique-des-étapes)
 
 ---
 
@@ -55,35 +52,6 @@ en 4 langues et tourne en production sur AWS et Vercel.
 - **Design** Pokédex rouge à deux écrans LCD, adapté au mobile.
 - Gestion des pannes : API ou PokéAPI injoignable, message clair et bouton
   « Réessayer », sans erreur JavaScript.
-
-## Architecture
-
-```
-                         ┌──────────────────────────────┐
-  navigateur ───────────▶│ Front SSR  — Vercel (Nuxt)   │──┐
-      │                  └──────────────────────────────┘  │
-      │                  ┌──────────────────────────────┐  │   PokéAPI
-      ├─────────────────▶│ Front SSG  — S3 + CloudFront │  ├──▶ (noms, fiches)
-      │                  └──────────────────────────────┘  │
-      │                                                    │
-      │   wishlist, likes (Accept-Language)                │
-      ▼                                                    │
-  ┌────────────────────────────────────┐                   │
-  │ API Hono — AWS Lambda + API Gateway│◀──────────────────┘
-  │ (eu-north-1)                       │
-  └───────────────┬────────────────────┘
-                  │ SQL paramétré (pooler Transaction)
-                  ▼
-  ┌────────────────────────────────────┐
-  │ PostgreSQL — Supabase (eu-north-1) │  tables wishlist, likes,
-  └────────────────────────────────────┘  schema_migrations
-```
-
-- Le **même code Hono** tourne en serveur Node (local) et sur Lambda : seul le
-  point d'entrée change.
-- Les **deux fronts** (SSR et SSG) appellent la **même API AWS**.
-- L'API, la base et le CDN sont dans la même région (Stockholm) pour limiter
-  la latence.
 
 ## Stack technique
 
@@ -245,34 +213,6 @@ cd back  && npm test && npm run test:db && npm run test:coverage
 cd front && npm test && npm run test:coverage && npm run test:e2e
 ```
 
-## CI/CD
-
-Un seul workflow, [.github/workflows/ci.yml](.github/workflows/ci.yml), lancé
-à chaque push :
-
-```
-i18n ─────────┐
-API · Install ┼─▶ API · Format / Lint / Typecheck / Tests (Vitest) / Tests BDD (Postgres)
-              │                    └──▶ API · Build + /health ──┐
-              └─▶ API · Paquet Lambda ─────────────────────────┤
-Install ─────────▶ Format / Lint / Typecheck / Tests (Vitest)    │
-                       └──▶ Build ──────────────────────────────┴─▶ E2E (Playwright)
-Coverage (rapport + badges)                                            │
-                                         ┌─────────────── main uniquement ──────┘
-                                         ▼
-                      Deploy (Vercel) + Deploy (S3 + CloudFront)
-                                         ▼
-                              Smoke tests (prod) ─▶ Version stable (tag)
-```
-
-- **Installs en cache** : `npm ci` une fois par projet, `node_modules`
-  restauré par les autres jobs.
-- **Contrôles** : ESLint, Prettier, TypeScript, Vitest, clés des traductions,
-  build, démarrage de l'API, paquet Lambda, e2e.
-- **Déploiements** seulement sur `main` et seulement si tout est vert.
-- **Coverage** : tableau dans le résumé du run, rapport HTML en artefact,
-  badges sur la branche `badges`.
-
 ## Déploiements
 
 | Cible                | Comment                             | Quand          |
@@ -383,17 +323,3 @@ node scripts/seo-check.mjs
 | 25  | SEO                     | SSR et SSG comparés sans JavaScript                                  |
 | 26  | Rollback                | tag `stable-*`, workflow de retour à la version précédente           |
 | 27  | Couverture              | rapport + badges dans GitHub, composables testés dans une app Nuxt   |
-
-## Limites connues
-
-- **API sans authentification** : une seule wishlist partagée par tous.
-- **Likes** : un même visiteur peut reliker en vidant son navigateur (pas de
-  comptes utilisateurs).
-- **SSG** : seules les fiches en anglais sont générées au build ; les autres
-  langues sont rendues par le navigateur (choix volontaire : 4 × 1025 pages
-  et ~8000 appels à PokéAPI à chaque build sinon).
-- **Noms français dans l'URL** (`/pokemon/salamèche`) non pris en charge :
-  PokéAPI ne connaît que les noms anglais et les numéros.
-- **Déploiement de l'API manuel** (choix du projet) ; son rollback aussi.
-- **Badge de couverture** visible seulement par les personnes ayant accès au
-  dépôt (dépôt privé).
