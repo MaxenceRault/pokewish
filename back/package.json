@@ -15,7 +15,8 @@
     "test:db": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run tests/db",
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist-lambda/index.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "deploy:lambda": "bash scripts/deploy-lambda.sh",
-    "package:lambda": "npm run build:lambda --silent && rm -f lambda.zip && cd dist-lambda && zip -q ../lambda.zip index.mjs"
+    "package:lambda": "npm run build:lambda --silent && rm -f lambda.zip && cd dist-lambda && zip -q ../lambda.zip index.mjs",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",

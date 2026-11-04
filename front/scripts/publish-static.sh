@@ -12,7 +12,8 @@ cd "$(dirname "$0")/.."
 
 BUCKET="${S3_BUCKET:-pokewish-static-805815160134}"
 DIST_ID="${CLOUDFRONT_DISTRIBUTION_ID:-E1G23D8DCWMLIO}"
-SITE=.output/public
+# SITE_DIR : dossier généré à publier (rollback : celui d'une ancienne version)
+SITE="${SITE_DIR:-.output/public}"
 
 [ -f "$SITE/index.html" ] || { echo "Lance d'abord : npm run generate"; exit 1; }
 

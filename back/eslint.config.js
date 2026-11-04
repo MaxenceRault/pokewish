@@ -5,7 +5,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'dist-lambda'] },
+  { ignores: ['dist', 'dist-lambda', 'coverage'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {

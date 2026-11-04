@@ -34,3 +34,6 @@ lambda.zip
 
 # Lien local vers le projet Vercel (vercel link)
 .vercel
+
+# Rapports de couverture (npm run test:coverage)
+coverage
