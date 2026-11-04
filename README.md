@@ -3,168 +3,397 @@
 [![coverage api](https://github.com/MaxenceRault/pokewish/blob/badges/coverage-api.svg?raw=true)](https://github.com/MaxenceRault/pokewish/blob/badges/COVERAGE.md)
 [![coverage front](https://github.com/MaxenceRault/pokewish/blob/badges/coverage-front.svg?raw=true)](https://github.com/MaxenceRault/pokewish/blob/badges/COVERAGE.md)
 
-Wishlist de Pokémon à capturer (6 maximum).
+Wishlist de Pokémon à capturer, dans un Pokédex rétro façon console portable.
+On cherche un Pokémon, on l'ajoute à sa wishlist (6 maximum, comme une
+équipe), on le marque capturé, on ouvre sa fiche et on la like. L'app existe
+en 4 langues et tourne en production sur AWS et Vercel.
 
-| Dossier  | Contenu                           | Port par défaut |
-| -------- | --------------------------------- | --------------- |
-| `front/` | App Nuxt (Vue + TypeScript)       | 3000            |
-| `back/`  | API Hono + TypeScript (sans base) | 3001            |
+| En ligne                     | Adresse                                                 |
+| ---------------------------- | ------------------------------------------------------- |
+| Front SSR (Vercel)           | https://pokewish.vercel.app                             |
+| Front statique SSG (AWS CDN) | https://d1nxawsm2mnxx8.cloudfront.net                   |
+| API (AWS Lambda)             | https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com |
 
-## Lancer en local
+---
 
-Le front a besoin de l'API pour la wishlist : lance les deux, dans deux terminaux.
+## Sommaire
 
-```bash
-cd back  && npm install && npm run dev   # http://localhost:3001/health
-cd front && npm install && npm run dev   # http://localhost:3000
+1. [Fonctionnalités](#fonctionnalités)
+2. [Architecture](#architecture)
+3. [Stack technique](#stack-technique)
+4. [Organisation du dépôt](#organisation-du-dépôt)
+5. [Lancer le projet en local](#lancer-le-projet-en-local)
+6. [API](#api)
+7. [Base de données et migrations](#base-de-données-et-migrations)
+8. [Front : SSR, SSG et langues](#front--ssr-ssg-et-langues)
+9. [Tests](#tests)
+10. [CI/CD](#cicd)
+11. [Déploiements](#déploiements)
+12. [Production : smoke tests, SEO, rollback](#production--smoke-tests-seo-rollback)
+13. [Sécurité](#sécurité)
+14. [Référence des commandes](#référence-des-commandes)
+15. [Historique des étapes](#historique-des-étapes)
+16. [Limites connues](#limites-connues)
+
+---
+
+## Fonctionnalités
+
+- **Recherche** dans les 1025 Pokémon (PokéAPI), par nom ou numéro, sans
+  tenir compte des accents ni des majuscules (« salameche » trouve Salamèche).
+- **Wishlist** stockée dans l'API (PostgreSQL) : ajout, « capturé », retrait.
+  **6 Pokémon maximum** et **pas de doublon**, règles appliquées par l'API.
+- **Fiche Pokémon** `/pokemon/[name]` (nom anglais ou numéro) : artwork,
+  catégorie, types, taille, poids, description, statistiques. Rendue côté
+  serveur (SSR) ou générée au build (SSG), avec un vrai **404** pour un
+  Pokémon inconnu.
+- **Likes** sur chaque fiche : compteur partagé par tous (API), « j'ai liké »
+  mémorisé dans le navigateur pour pouvoir annuler.
+- **4 langues** : anglais (par défaut), français, espagnol, allemand. Les
+  noms de Pokémon, les types, les statistiques, les textes de l'interface **et
+  les messages d'erreur de l'API** suivent la langue choisie.
+- **Design** Pokédex rouge à deux écrans LCD, adapté au mobile.
+- Gestion des pannes : API ou PokéAPI injoignable, message clair et bouton
+  « Réessayer », sans erreur JavaScript.
+
+## Architecture
+
+```
+                         ┌──────────────────────────────┐
+  navigateur ───────────▶│ Front SSR  — Vercel (Nuxt)   │──┐
+      │                  └──────────────────────────────┘  │
+      │                  ┌──────────────────────────────┐  │   PokéAPI
+      ├─────────────────▶│ Front SSG  — S3 + CloudFront │  ├──▶ (noms, fiches)
+      │                  └──────────────────────────────┘  │
+      │                                                    │
+      │   wishlist, likes (Accept-Language)                │
+      ▼                                                    │
+  ┌────────────────────────────────────┐                   │
+  │ API Hono — AWS Lambda + API Gateway│◀──────────────────┘
+  │ (eu-north-1)                       │
+  └───────────────┬────────────────────┘
+                  │ SQL paramétré (pooler Transaction)
+                  ▼
+  ┌────────────────────────────────────┐
+  │ PostgreSQL — Supabase (eu-north-1) │  tables wishlist, likes,
+  └────────────────────────────────────┘  schema_migrations
 ```
 
-Pour pointer le front vers une autre API (tests e2e, autre port) :
-`NUXT_PUBLIC_API_BASE=http://localhost:4000 npm run dev`.
+- Le **même code Hono** tourne en serveur Node (local) et sur Lambda : seul le
+  point d'entrée change.
+- Les **deux fronts** (SSR et SSG) appellent la **même API AWS**.
+- L'API, la base et le CDN sont dans la même région (Stockholm) pour limiter
+  la latence.
+
+## Stack technique
+
+| Domaine          | Outils                                                          |
+| ---------------- | --------------------------------------------------------------- |
+| Front            | Nuxt 4 (Vue 3, TypeScript), @nuxtjs/i18n                        |
+| API              | Hono, TypeScript, postgres.js                                   |
+| Base             | PostgreSQL (Supabase), migrations SQL avec un runner maison     |
+| Données Pokémon  | PokéAPI (REST + GraphQL)                                        |
+| Qualité          | ESLint, Prettier, TypeScript strict                             |
+| Tests            | Vitest (+ @nuxt/test-utils, happy-dom), Playwright, coverage v8 |
+| CI/CD            | GitHub Actions                                                  |
+| Hébergement      | AWS Lambda + API Gateway, S3 + CloudFront, Vercel               |
+| Authentification | OIDC GitHub → AWS (aucune clé AWS stockée dans GitHub)          |
+
+## Organisation du dépôt
+
+```
+pokewish/
+├── .github/workflows/
+│   ├── ci.yml              CI + CD (contrôles, tests, déploiements, smoke)
+│   └── rollback.yml        retour à une version stable (manuel)
+├── scripts/                scripts Node sans dépendance (racine)
+│   ├── check-locales.mjs   clés des traductions front + back
+│   ├── smoke.mjs           smoke tests de la production
+│   ├── seo-check.mjs       HTML des fiches sans JavaScript (SSR = SSG)
+│   └── coverage-report.mjs rapport + badges de couverture
+├── back/                   API Hono
+│   ├── src/                app, routes, stores, i18n, migrations, lambda
+│   ├── db/migrations/      000_init.sql, 001_likes.sql
+│   ├── scripts/            migrate.ts, deploy-lambda.sh
+│   └── tests/              unitaires + tests/db (vraie base)
+└── front/                  app Nuxt
+    ├── app/                pages, composants, composables, utils
+    ├── i18n/locales/       en, fr, es, de
+    ├── scripts/            hébergement statique S3 + CloudFront
+    ├── tests/              unitaires + tests/nuxt (composables)
+    └── e2e/                tests Playwright + faux PokéAPI
+```
+
+## Lancer le projet en local
+
+Prérequis : Node 24, npm 11.
+
+```bash
+# API (terminal 1)
+cd back
+npm install
+cp .env.example .env     # remplir DATABASE_URL (sinon : wishlist en mémoire)
+npm run db:migrate       # si une base est configurée
+npm run dev              # http://localhost:3001/health
+
+# Front (terminal 2)
+cd front
+npm install
+npm run dev              # http://localhost:3000
+```
+
+Au démarrage, l'API affiche `Wishlist : PostgreSQL (DATABASE_URL)` ou
+`Wishlist : en mémoire`.
+
+### Variables d'environnement
+
+| Fichier     | Variable                              | Rôle                                                |
+| ----------- | ------------------------------------- | --------------------------------------------------- |
+| `back/.env` | `DATABASE_URL`                        | Supabase, pooler **Session** (port 5432)            |
+|             | `TEST_DATABASE_URL`                   | base des tests `npm run test:db` (schémas jetables) |
+|             | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | accès REST Supabase (vérifications)                 |
+|             | `LAMBDA_CORS_ORIGINS`                 | origines autorisées par l'API déployée              |
+| front (env) | `NUXT_PUBLIC_API_BASE`                | adresse de l'API (défaut `http://localhost:3001`)   |
+|             | `NUXT_PUBLIC_POKEAPI_URL`             | PokéAPI (remplacée par un faux PokéAPI dans l'e2e)  |
+
+`back/.env` est ignoré par git ; le modèle est `back/.env.example`.
 
 ## API
 
-La wishlist est stockée dans **PostgreSQL (Supabase)**, table `wishlist`
-([back/db/init.sql](back/db/init.sql)). Sans `DATABASE_URL`, l'API retombe
-sur un tableau en mémoire (perdu au redémarrage) : c'est le cas dans la CI.
-
-```bash
-cd back
-cp .env.example .env    # puis remplir DATABASE_URL (Supabase > Connect > Session pooler)
-npm run db:migrate      # applique les migrations pas encore appliquées
-npm run dev             # « Wishlist : PostgreSQL (DATABASE_URL) »
-```
-
-**Migrations** : `back/db/migrations/NNN_nom.sql`, appliquées dans l'ordre
-par un runner maison ([back/src/migrations.ts](back/src/migrations.ts)). La
-table `schema_migrations` retient celles déjà appliquées : chacune ne
-s'exécute qu'une fois, dans une transaction (rien d'appliqué à moitié), sous
-verrou. `000_init` = la wishlist, `001_likes` = les likes.
-
-Tests des routes sur une **vraie base**, sans mock SQL (`back/tests/db/`) :
-CRUD, doublons, limite de 6, persistance. Chaque fichier travaille dans un
-schéma jetable `pokewish_test_*`, vidé entre chaque test puis supprimé.
-
-```bash
-cd back && npm run test:db   # utilise TEST_DATABASE_URL de back/.env
-```
-
-Dans la CI, ils tournent contre un PostgreSQL 17 jetable (service GitHub Actions).
-
 | Route                  | Corps                  | Réponses                                    |
 | ---------------------- | ---------------------- | ------------------------------------------- |
-| `GET /health`          |                        | 200                                         |
+| `GET /health`          |                        | 200 `{ status, uptime }`                    |
 | `GET /wishlist`        |                        | 200 liste                                   |
 | `POST /wishlist`       | `{ "id": 25, "name" }` | 201, 400, 409 `DUPLICATE` / `WISHLIST_FULL` |
 | `PATCH /wishlist/:id`  | `{ "caught": true }`   | 200, 400, 404                               |
 | `DELETE /wishlist/:id` |                        | 204, 400, 404                               |
-| `GET /likes/:id`       |                        | 200 `{ "id", "likes" }`, 400                |
+| `GET /likes/:id`       |                        | 200 `{ id, likes }`, 400                    |
 | `POST /likes/:id`      |                        | 200 (+1), 400                               |
 | `DELETE /likes/:id`    |                        | 200 (−1, jamais sous 0), 400                |
 
-Les erreurs ont toutes la forme `{ "error": "CODE", "message": "…" }`.
+- Erreurs toujours au format `{ "error": "CODE", "message": "…" }`. Le **code**
+  ne change jamais, le **message** est traduit selon `Accept-Language`
+  (`back/src/locales/{en,fr,es,de}.json`, anglais par défaut).
+- Erreur inattendue (base injoignable…) : `500 { "error": "INTERNAL" }`.
+- **CORS** : `localhost` en développement, sinon `CORS_ORIGINS` (les deux
+  fronts de production).
+- Les stores ont deux implémentations au même comportement : **en mémoire**
+  (tests, CI) et **PostgreSQL** (production), choisies selon `DATABASE_URL`.
 
-## Déploiement de l'API (AWS Lambda)
+## Base de données et migrations
 
-L'API tourne sur **AWS Lambda** derrière **API Gateway** (HTTP API), région
-`eu-north-1` comme la base Supabase. Même app Hono que le serveur Node : seul
-le point d'entrée change ([back/src/lambda.ts](back/src/lambda.ts)).
+PostgreSQL sur Supabase. Toutes les requêtes sont **paramétrées** (pas
+d'injection SQL possible ; un test le vérifie avec un nom piégé).
 
-Le déploiement est **manuel** (la CI vérifie seulement que le paquet Lambda
-se construit) :
+- `back/db/migrations/000_init.sql` : table `wishlist` (clé primaire sur le
+  numéro de Pokédex = pas de doublon), sécurité RLS.
+- `back/db/migrations/001_likes.sql` : table `likes`.
+- **Runner maison** ([back/src/migrations.ts](back/src/migrations.ts)) :
+  - la table `schema_migrations` retient les migrations appliquées : chacune
+    ne s'exécute **qu'une fois** ;
+  - chaque migration tourne dans une **transaction** : une erreur n'en laisse
+    rien à moitié ;
+  - un **verrou** empêche deux runners de migrer en même temps.
 
 ```bash
-cd back && npm run deploy:lambda
+cd back && npm run db:migrate
+# ✓ 000_init appliquée / ✓ 001_likes appliquée   (1re fois)
+# · 000_init (déjà appliquée) …                   (ensuite)
 ```
 
-Le script est rejouable : il construit le paquet, crée ou met à jour le rôle
-IAM, la Lambda et l'API Gateway, puis vérifie `/health` et `/wishlist`. Il lit
-`back/.env` et passe à la Lambda :
+La limite de 6 est garantie par une transaction verrouillée : deux ajouts
+simultanés ne peuvent pas la dépasser. Les likes s'incrémentent en une seule
+requête atomique.
 
-- `DATABASE_URL` : pooler Supabase « Transaction » (port 6543), déduit de
-  `DATABASE_URL` ou fourni via `LAMBDA_DATABASE_URL` ;
-- `CORS_ORIGINS` : origines du front autorisées (`LAMBDA_CORS_ORIGINS`,
-  défaut `http://localhost:3000`).
+## Front : SSR, SSG et langues
 
-Front branché sur l'API AWS :
-`NUXT_PUBLIC_API_BASE=https://<id>.execute-api.eu-north-1.amazonaws.com npm run dev`
+- **SSR (Vercel)** : les fiches sont rendues par le serveur Nuxt ; le HTML
+  contient déjà le Pokémon (titre, description, stats, meta SEO).
+- **SSG (S3 + CloudFront)** : `npm run generate` récupère les 1025 noms sur
+  PokéAPI au build et génère **une page HTML par fiche** (`/pokemon/pikachu`),
+  plus l'accueil dans chaque langue. Les autres langues et les liens par
+  numéro sont rendus par le navigateur (repli sur `200.html`).
+- **Langues** : `/` en anglais, `/fr`, `/es`, `/de`. Le sélecteur garde la page
+  courante. Les noms de Pokémon viennent de PokéAPI (GraphQL) dans la langue
+  choisie, mis en cache dans le navigateur.
+- **SEO** : `<title>`, `<html lang>`, meta description et Open Graph sur
+  chaque fiche, présents sans JavaScript.
 
-## Front en ligne
+## Tests
 
-| Hébergement                       | Adresse                               | Rendu              |
-| --------------------------------- | ------------------------------------- | ------------------ |
-| Vercel                            | https://pokewish.vercel.app           | SSR (serveur Nuxt) |
-| S3 + CloudFront (CDN, eu-north-1) | https://d1nxawsm2mnxx8.cloudfront.net | statique (SSG)     |
+| Type                   | Où                  | Nombre | Ce qui est couvert                                             |
+| ---------------------- | ------------------- | -----: | -------------------------------------------------------------- |
+| Unitaires API          | `back/tests/`       |     66 | règles, routes (`app.request()`), i18n, Lambda, CORS           |
+| API sur **vraie base** | `back/tests/db/`    |     25 | CRUD, doublons, limite de 6, likes, migrations, sans mock SQL  |
+| Unitaires front        | `front/tests/`      |     56 | recherche, client API, PokéAPI simulée, localStorage           |
+| Composables (app Nuxt) | `front/tests/nuxt/` |     21 | useWishlist, useLikes, usePokemonSearch                        |
+| E2E Playwright         | `front/e2e/`        |     26 | parcours navigateur → API : fiche, langues, persistance, likes |
 
-Les deux appellent la même API AWS. Ils sont déployés par la CI sur `main`,
-une fois tous les contrôles verts (jobs « Deploy (Vercel) » et
-« Deploy (S3 + CloudFront) »).
+- **Vraie base isolée** : chaque fichier de `tests/db` travaille dans un
+  schéma jetable `pokewish_test_*`, créé par les migrations, vidé entre
+  chaque test puis supprimé. En CI : PostgreSQL 17 jetable.
+- **E2E** : Playwright démarre la vraie API (port 3101), un faux PokéAPI
+  (3102) et le front buildé (3100). Aucun appel réseau externe ; chaque étape
+  est vérifiée à l'écran puis dans l'API.
+- **Couverture** (Vitest, v8) : API ~98 %, front ~99 % de la logique
+  TypeScript (`app/**/*.ts` ; les pages `.vue` sont couvertes par l'e2e).
+- Les tests ont été validés en **cassant volontairement** le code (limite de
+  6, likes, CORS, double clic…) : ils échouent à chaque fois.
 
-**Site statique** : `npm run generate` récupère les 1025 noms de Pokémon sur
-PokéAPI et génère une page HTML par fiche (`/pokemon/pikachu`), plus
-l'accueil dans chaque langue. Les autres langues et les liens par numéro
-sont rendus dans le navigateur (repli sur `200.html`).
+```bash
+cd back  && npm test && npm run test:db && npm run test:coverage
+cd front && npm test && npm run test:coverage && npm run test:e2e
+```
+
+## CI/CD
+
+Un seul workflow, [.github/workflows/ci.yml](.github/workflows/ci.yml), lancé
+à chaque push :
+
+```
+i18n ─────────┐
+API · Install ┼─▶ API · Format / Lint / Typecheck / Tests (Vitest) / Tests BDD (Postgres)
+              │                    └──▶ API · Build + /health ──┐
+              └─▶ API · Paquet Lambda ─────────────────────────┤
+Install ─────────▶ Format / Lint / Typecheck / Tests (Vitest)    │
+                       └──▶ Build ──────────────────────────────┴─▶ E2E (Playwright)
+Coverage (rapport + badges)                                            │
+                                         ┌─────────────── main uniquement ──────┘
+                                         ▼
+                      Deploy (Vercel) + Deploy (S3 + CloudFront)
+                                         ▼
+                              Smoke tests (prod) ─▶ Version stable (tag)
+```
+
+- **Installs en cache** : `npm ci` une fois par projet, `node_modules`
+  restauré par les autres jobs.
+- **Contrôles** : ESLint, Prettier, TypeScript, Vitest, clés des traductions,
+  build, démarrage de l'API, paquet Lambda, e2e.
+- **Déploiements** seulement sur `main` et seulement si tout est vert.
+- **Coverage** : tableau dans le résumé du run, rapport HTML en artefact,
+  badges sur la branche `badges`.
+
+## Déploiements
+
+| Cible                | Comment                             | Quand          |
+| -------------------- | ----------------------------------- | -------------- |
+| API (Lambda)         | `cd back && npm run deploy:lambda`  | **à la main**  |
+| Front SSR (Vercel)   | job « Deploy (Vercel) », CLI Vercel | CI, sur `main` |
+| Front SSG (S3 + CDN) | job « Deploy (S3 + CloudFront) »    | CI, sur `main` |
+
+- **API** : le script est rejouable (rôle IAM, Lambda arm64, API Gateway), il
+  passe à la Lambda `DATABASE_URL` (pooler **Transaction**, port 6543, adapté
+  à Lambda) et `CORS_ORIGINS`, puis vérifie `/health` et `/wishlist`.
+- **Vercel** : déploiement automatique de Vercel désactivé
+  (`front/vercel.json`) ; c'est la CI qui déploie, après réussite. Secrets
+  dans l'environnement GitHub `prod` : `VERCEL_TOKEN`, `VERCEL_ORG_ID`
+  (`team_…`), `VERCEL_PROJECT_ID`, variable `FRONT_URL`.
+- **S3 + CloudFront** : bucket privé lisible seulement par CloudFront,
+  fonction CloudFront (`/x` → `/x/index.html`), invalidation du cache à chaque
+  publication. Mise en place unique :
 
 ```bash
 cd front
-bash scripts/setup-static-site.sh          # une fois : bucket S3 + CloudFront
-bash scripts/setup-github-static-deploy.sh # une fois : droits OIDC de la CI
-NUXT_PUBLIC_API_BASE=https://3z9imkuxde.execute-api.eu-north-1.amazonaws.com npm run generate
-bash scripts/publish-static.sh             # envoi S3 + invalidation CloudFront
+bash scripts/setup-static-site.sh          # bucket, CDN, fonction
+bash scripts/setup-github-static-deploy.sh # rôle OIDC de la CI
 ```
 
 ## Production : smoke tests, SEO, rollback
 
-Après chaque déploiement (sur `main`), la CD vérifie la production ; une URL
-critique en échec la fait échouer :
+- **Smoke tests** ([scripts/smoke.mjs](scripts/smoke.mjs)) : 13 contrôles
+  (API, SSR, SSG, codes HTTP dont les 404 attendus, branchement sur l'API
+  AWS), code **et** contenu. Une URL critique en échec fait **échouer la CD**.
+- **SEO** ([scripts/seo-check.mjs](scripts/seo-check.mjs)) : HTML brut, sans
+  JavaScript, de 5 fiches en SSR et SSG : title, h1, meta description, 6
+  stats, pas de coquille vide, **SSR = SSG**.
+- **Version stable** : si la production est verte, la CD pose un tag
+  `stable-<date>`.
+- **Rollback** ([.github/workflows/rollback.yml](.github/workflows/rollback.yml)) :
+  Actions → Rollback → Run workflow. Sans version donnée, le dernier tag
+  stable différent de `main` est reconstruit et redéployé (Vercel + S3), puis
+  les smoke tests vérifient la production. L'API se restaure à la main :
+  `git checkout stable-… && cd back && npm run deploy:lambda`.
 
 ```bash
-node scripts/smoke.mjs      # /health, /wishlist, /likes, pages SSR et SSG, codes HTTP (dont 404)
-node scripts/seo-check.mjs  # HTML des fiches SANS JavaScript : title, h1, description, stats ; SSR = SSG
+node scripts/smoke.mjs
+node scripts/seo-check.mjs
 ```
 
-Si tout est vert, la version est marquée par un tag `stable-<date>`.
-**Rollback** : Actions > **Rollback** > Run workflow. Sans version donnée, le
-dernier tag `stable-*` différent de `main` est reconstruit et redéployé
-(Vercel + S3/CloudFront), puis les smoke tests vérifient la production.
-L'API se restaure à la main : `git checkout stable-… && cd back && npm run deploy:lambda`.
+## Sécurité
 
-## Couverture des tests
+- **Aucun secret dans le dépôt** : `back/.env` ignoré par git, secrets Vercel
+  dans GitHub, mot de passe de la base dans les variables (chiffrées) de la
+  Lambda.
+- **GitHub → AWS par OIDC** : pas de clé AWS stockée ; le rôle ne peut être
+  pris que par ce dépôt sur `main`, et ne peut qu'écrire dans le bucket du
+  site et vider son cache.
+- **Base** : requêtes paramétrées, RLS activée (la clé publique Supabase ne
+  lit rien), accès par l'API uniquement.
+- **Bucket S3 privé** : seul CloudFront peut le lire.
+- **CORS** limité aux deux fronts de production et à `localhost`.
+- À savoir : l'API est **publique et sans authentification** (projet
+  d'apprentissage) ; n'importe qui connaissant l'URL peut modifier la
+  wishlist.
 
-`npm run test:coverage` (dans `front/` ou `back/`) : rapport dans
-`coverage/index.html`. Dans la CI, le job **Coverage** publie le tableau dans
-le résumé du run, le rapport HTML en artefact (`rapport-couverture`), et sur
-`main` les badges ci-dessus (branche `badges`, [COVERAGE.md](https://github.com/MaxenceRault/pokewish/blob/badges/COVERAGE.md)).
+## Référence des commandes
 
-## Tests e2e (Playwright)
+| Où       | Commande                                                                         | Rôle                                |
+| -------- | -------------------------------------------------------------------------------- | ----------------------------------- |
+| racine   | `node scripts/check-locales.mjs`                                                 | clés des traductions (front + back) |
+|          | `node scripts/smoke.mjs`                                                         | smoke tests de la production        |
+|          | `node scripts/seo-check.mjs`                                                     | HTML des fiches sans JavaScript     |
+| `back`   | `npm run dev` / `npm start`                                                      | serveur (lit `.env`)                |
+|          | `npm test` / `npm run test:db` / `npm run test:coverage`                         | tests                               |
+|          | `npm run db:migrate`                                                             | migrations SQL                      |
+|          | `npm run build:lambda` / `npm run package:lambda`                                | paquet Lambda                       |
+|          | `npm run deploy:lambda`                                                          | déploiement de l'API sur AWS        |
+| `front`  | `npm run dev` / `npm run build` / `npm run generate`                             | dev, SSR, SSG                       |
+|          | `npm test` / `npm run test:coverage`                                             | tests unitaires                     |
+|          | `npm run test:e2e` / `npm run test:e2e:ui`                                       | tests Playwright                    |
+| les deux | `npm run lint` / `npm run format` / `npm run format:check` / `npm run typecheck` | qualité                             |
 
-```bash
-cd front && npm run test:e2e      # ou test:e2e:ui pour l'interface visuelle
-```
+## Historique des étapes
 
-Playwright build et démarre lui-même l'API (port 3101) et le front (port 3100),
-sans gêner les serveurs de dev. PokéAPI est simulée : pas besoin de réseau.
-Premier lancement : `npx playwright install chromium`.
+| #   | Étape                   | Résultat                                                             |
+| --- | ----------------------- | -------------------------------------------------------------------- |
+| 1   | Nuxt + GitHub Actions   | projet Nuxt, première CI                                             |
+| 2   | Wishlist                | recherche PokéAPI, ajout/retrait, sauvegarde (localStorage puis API) |
+| 3   | Design                  | Pokédex rétro à deux écrans, responsive                              |
+| 4   | ESLint                  | `console.log` et `debugger` interdits                                |
+| 5   | Prettier                | `singleQuote`, sans point-virgule                                    |
+| 6   | TypeScript              | types `Pokemon` / `WishlistItem`, typecheck des tests                |
+| 7   | Règle des 6             | testée (ajout, doublon, liste pleine)                                |
+| 8   | Tests PokéAPI           | `fetch` simulé (200, 404), passent sans réseau                       |
+| 9   | Tests localStorage      | vide, JSON invalide, stockage bloqué : pas de plantage               |
+| 10  | Build dans la pipeline  | un import inexistant casse le build ; jobs séparés dans les PR       |
+| 11  | API Hono                | `/health`, séparation `front/` et `back/`                            |
+| 12  | Routes wishlist         | GET / POST / PATCH / DELETE, testées avec `app.request()`            |
+| 13  | Nuxt ↔ Hono             | le front appelle l'API                                               |
+| 14  | Playwright              | e2e du front avec la vraie API, puis dans la CI (CORS cassé → rouge) |
+| 15  | Supabase                | `init.sql`, connexion PostgreSQL, requêtes paramétrées, persistance  |
+| 16  | Tests sur vraie base    | CRUD, doublons, limite de 6 sans mock SQL                            |
+| 17  | Fiche `/pokemon/[name]` | PokéAPI, cas 404                                                     |
+| 18  | Langues                 | en/fr/es/de (front + erreurs API), script de vérification des clés   |
+| 19  | AWS Lambda              | API déployée derrière API Gateway                                    |
+| 20  | Vercel SSR              | front en SSR, déployé par la CI après réussite                       |
+| 21  | SSG + S3 + CloudFront   | une page par Pokémon générée au build, publiée par la CI             |
+| 22  | Likes + migrations SQL  | `schema_migrations`, runner maison, `001_likes.sql`                  |
+| 23  | Playwright étendu       | fiche, langues, persistance, likes, du navigateur jusqu'à l'API      |
+| 24  | Smoke tests             | la CD échoue si une URL critique ne répond pas                       |
+| 25  | SEO                     | SSR et SSG comparés sans JavaScript                                  |
+| 26  | Rollback                | tag `stable-*`, workflow de retour à la version précédente           |
+| 27  | Couverture              | rapport + badges dans GitHub, composables testés dans une app Nuxt   |
 
-## Contrôles (identiques en local et dans la CI)
+## Limites connues
 
-Dans `front/` comme dans `back/` :
-
-```bash
-npm run lint          # ESLint
-npm run format:check  # Prettier
-npm run typecheck     # TypeScript
-npm test              # Vitest
-npm run build         # Build
-```
-
-À la racine, les traductions du front et du back (chaque langue comparée à
-`en.json` : clés manquantes ou en trop, textes vides, paramètres `{…}`) :
-
-```bash
-node scripts/check-locales.mjs
-```
-
-La CI (`.github/workflows/ci.yml`) lance ces 5 contrôles pour chaque projet à
-chaque push, plus la vérification des traductions. Pour le back, elle démarre
-aussi l'API et vérifie que `GET /health` répond 200.
+- **API sans authentification** : une seule wishlist partagée par tous.
+- **Likes** : un même visiteur peut reliker en vidant son navigateur (pas de
+  comptes utilisateurs).
+- **SSG** : seules les fiches en anglais sont générées au build ; les autres
+  langues sont rendues par le navigateur (choix volontaire : 4 × 1025 pages
+  et ~8000 appels à PokéAPI à chaque build sinon).
+- **Noms français dans l'URL** (`/pokemon/salamèche`) non pris en charge :
+  PokéAPI ne connaît que les noms anglais et les numéros.
+- **Déploiement de l'API manuel** (choix du projet) ; son rollback aussi.
+- **Badge de couverture** visible seulement par les personnes ayant accès au
+  dépôt (dépôt privé).
